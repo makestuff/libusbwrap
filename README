@@ -1,0 +1,15 @@
+A thin wrapper around libusb.
+
+The project build assumes a directory structure like this:
+
+src
+|
++-common
+|
++-apps
+|
++-libs
+| |
+| +-libusbwrap
+|
++-3rd
