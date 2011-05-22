@@ -14,14 +14,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//#ifdef WIN32
-//	#include <Windows.h>
-//#else
-//	#define _BSD_SOURCE
-//	#include <unistd.h>
-//#endif
+#include <stdio.h>
 #include <makestuff.h>
 #include <liberror.h>
+#include <usb.h>
 #include "libusbwrap.h"
 
 // Initialise USB
@@ -60,12 +56,12 @@ USBStatus usbIsDeviceAvailable(uint16 vid, uint16 pid, bool *isAvailable, const 
 //
 USBStatus usbOpenDevice(
 	uint16 vid, uint16 pid, int configuration, int interface, int alternateInterface,
-	UsbDeviceHandle **devHandlePtr, const char **error)
+	struct usb_dev_handle **devHandlePtr, const char **error)
 {
 	USBStatus returnCode;
 	struct usb_bus *bus;
 	struct usb_device *thisDevice;
-	UsbDeviceHandle *deviceHandle;
+	struct usb_dev_handle *deviceHandle;
 	int uStatus;
 	usb_find_busses();
 	bus = usb_get_busses();

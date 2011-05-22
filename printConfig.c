@@ -15,11 +15,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <liberror.h>
+#include <stdio.h>
+#include <usb.h>
 #include "libusbwrap.h"
 
 // Print out the configuration tree
 //
-USBStatus usbPrintConfiguration(UsbDeviceHandle *deviceHandle, FILE *stream, const char **error) {
+USBStatus usbPrintConfiguration(struct usb_dev_handle *deviceHandle, FILE *stream, const char **error) {
 	USBStatus returnCode;
 	char descriptorBuffer[1024];
 	char *ptr = descriptorBuffer;
