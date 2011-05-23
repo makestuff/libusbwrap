@@ -20,9 +20,11 @@ TYPE    := lib
 SUBDIRS :=
 
 ifeq ($(OS),Windows_NT)
-	GENEXTRALIBS_REL := echo $(ROOT)/3rd/libusb-win32/lib/msvc/libusb.lib
+	LIBUSB_VERSION := 1.2.4.0
+	GENEXTRALIBS_REL := echo $(ROOT)/3rd/libusb-win32-bin-$(LIBUSB_VERSION)/lib/msvc/libusb.lib
 	GENEXTRALIBS_DBG := $(GENEXTRALIBS_REL)
-	EXTRA_INCS := -I$(ROOT)/3rd/libusb-win32/include
+	EXTRA_INCS := -I$(ROOT)/3rd/libusb-win32-bin-$(LIBUSB_VERSION)/include
+	PRE_BUILD := $(ROOT)/3rd/libusb-win32-bin-$(LIBUSB_VERSION)
 else
 	GENEXTRALIBS_REL := echo -lusb
 	GENEXTRALIBS_DBG := $(GENEXTRALIBS_REL)
