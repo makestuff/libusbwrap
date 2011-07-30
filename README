@@ -1,15 +1,11 @@
-A thin wrapper around libusb.
+A thin wrapper around LibUSB.
 
-The project build assumes a directory structure like this:
+See http://bit.ly/usbwrap-api for the API docs.
 
-src
-|
-+-common
-|
-+-apps
-|
-+-libs
-| |
-| +-libusbwrap
-|
-+-3rd
+To build, first you need to install the MakeStuff Build Environment (http://bit.ly/makestuff) for
+your platform, then do:
+
+chris@wotan$ cd makestuff/libs
+chris@wotan$ ../common/msget.sh libusbwrap   # or msgit.sh if you want a local git repo
+chris@wotan$ cd libusbwrap
+chris@wotan$ make

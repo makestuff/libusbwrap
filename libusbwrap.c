@@ -23,7 +23,7 @@
 
 // Return true if vp is VVVV:PPPP where V and P are hex digits:
 //
-static bool validateVidPid(const char *vp) {
+bool usbValidateVidPid(const char *vp) {
 	int i;
 	char ch;
 	if ( !vp ) {
@@ -161,7 +161,7 @@ USBStatus usbOpenDeviceVP(
 	struct usb_dev_handle **devHandlePtr, const char **error)
 {
 	uint16 vid, pid;
-	if ( !validateVidPid(vp) ) {
+	if ( !usbValidateVidPid(vp) ) {
 		errRender(error, "The supplied VID:PID \"%s\" is invalid; it should look like 04B4:8613", vp);
 		return USB_INVALID_VIDPID;
 	}

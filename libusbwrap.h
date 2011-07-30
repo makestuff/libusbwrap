@@ -173,6 +173,17 @@ extern "C" {
 	) WARN_UNUSED_RESULT;
 
 	/**
+	 * @brief Validate a VID:PID string.
+	 *
+	 * Return true if the supplied string is of the form VVVV:PPPP where the Vs and Ps are hex
+	 * digits, else return false.
+	 *
+	 * @param vp The VID:PID to verify.
+	 * @returns \c true if the supplied string is a valid VID:PID.
+	 */
+	bool usbValidateVidPid(const char *vp);
+
+	/**
 	 * @brief Free an error allocated when one of the other functions fails.
 	 *
 	 * @param err An error message previously allocated by one of the other library functions.
