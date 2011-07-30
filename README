@@ -1,4 +1,4 @@
-A thin wrapper around LibUSB.
+A thin wrapper around LibUSB (http://libusb.org).
 
 See http://bit.ly/usbwrap-api for the API docs.
 
@@ -8,4 +8,4 @@ your platform, then do:
 chris@wotan$ cd makestuff/libs
 chris@wotan$ ../common/msget.sh libusbwrap   # or msgit.sh if you want a local git repo
 chris@wotan$ cd libusbwrap
-chris@wotan$ make
+chris@wotan$ make deps
