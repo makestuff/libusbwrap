@@ -15,10 +15,43 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <stdio.h>
+#include <string.h>
 #include <makestuff.h>
 #include <liberror.h>
 #include <usb.h>
 #include "libusbwrap.h"
+
+// Return true if vp is VVVV:PPPP where V and P are hex digits:
+//
+static bool validateVidPid(const char *vp) {
+	int i;
+	char ch;
+	if ( !vp ) {
+		return false;
+	}
+	if ( strlen(vp) != 9 ) {
+		return false;
+	}
+	if ( vp[4] != ':' ) {
+		return false;
+	}
+	for ( i = 0; i < 9; i++ ) {
+		ch = vp[i];
+		if ( i == 4 ) {
+			if ( ch != ':' ) {
+				return false;
+			}
+		} else if (
+			ch < '0' ||
+			(ch > '9' && ch < 'A') ||
+			(ch > 'F' && ch < 'a') ||
+			ch > 'f')
+		{
+			return false;
+		}
+	}
+	return true;
+}
 
 // Initialise USB
 //
@@ -55,7 +88,7 @@ USBStatus usbIsDeviceAvailable(uint16 vid, uint16 pid, bool *isAvailable, const 
 // Find the descriptor of the first occurance of the specified device
 //
 USBStatus usbOpenDevice(
-	uint16 vid, uint16 pid, int configuration, int interface, int alternateInterface,
+	uint16 vid, uint16 pid, int configuration, int iface, int alternateInterface,
 	struct usb_dev_handle **devHandlePtr, const char **error)
 {
 	USBStatus returnCode;
@@ -97,7 +130,7 @@ USBStatus usbOpenDevice(
 				errRender(error, "usb_set_configuration(): %s", usb_strerror());
 				FAIL(USB_CANNOT_SET_CONFIGURATION);
 			}
-			uStatus = usb_claim_interface(deviceHandle, interface);
+			uStatus = usb_claim_interface(deviceHandle, iface);
 			if ( uStatus < 0 ) {
 				errRender(error, "usb_claim_interface(): %s", usb_strerror());
 				FAIL(USB_CANNOT_CLAIM_INTERFACE);
@@ -119,4 +152,21 @@ USBStatus usbOpenDevice(
 	returnCode = USB_NO_BUSES;
 cleanup:
 	return returnCode;
+}
+
+// Accept VID:PID as a string
+//
+USBStatus usbOpenDeviceVP(
+	const char *vp, int configuration, int iface, int alternateInterface,
+	struct usb_dev_handle **devHandlePtr, const char **error)
+{
+	uint16 vid, pid;
+	if ( !validateVidPid(vp) ) {
+		errRender(error, "The supplied VID:PID \"%s\" is invalid; it should look like 04B4:8613", vp);
+		return USB_INVALID_VIDPID;
+	}
+	vid = (uint16)strtoul(vp, NULL, 16);
+	pid = (uint16)strtoul(vp+5, NULL, 16);
+	return usbOpenDevice(
+		vid, pid, configuration, iface, alternateInterface, devHandlePtr, error);
 }
