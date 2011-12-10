@@ -49,7 +49,7 @@ USBStatus usbPrintConfiguration(struct usb_dev_handle *deviceHandle, FILE *strea
 		"configDescriptor {\n    bLength = 0x%02X\n    bDescriptorType = 0x%02X\n    wTotalLength = 0x%04X\n    bNumInterfaces = 0x%02X\n    bConfigurationValue = 0x%02X\n    iConfiguration = 0x%02X\n    bmAttributes = 0x%02X\n    MaxPower = 0x%02X\n",
 		configDesc->bLength,
 		configDesc->bDescriptorType,
-		configDesc->wTotalLength,
+		littleEndian16(configDesc->wTotalLength),
 		configDesc->bNumInterfaces,
 		configDesc->bConfigurationValue,
 		configDesc->iConfiguration,
@@ -84,7 +84,7 @@ USBStatus usbPrintConfiguration(struct usb_dev_handle *deviceHandle, FILE *strea
 				endpointDesc->bDescriptorType,
 				endpointDesc->bEndpointAddress,
 				endpointDesc->bmAttributes,
-				endpointDesc->wMaxPacketSize,
+				littleEndian16(endpointDesc->wMaxPacketSize),
 				endpointDesc->bInterval,
 				endpointDesc->bRefresh,
 				endpointDesc->bSynchAddress
