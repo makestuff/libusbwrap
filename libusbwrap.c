@@ -18,7 +18,11 @@
 #include <string.h>
 #include <makestuff.h>
 #include <liberror.h>
-#include <usb.h>
+#ifdef WIN32
+	#include <lusb0_usb.h>
+#else
+	#include <usb.h>
+#endif
 #include "libusbwrap.h"
 
 // Return true if vp is VVVV:PPPP where V and P are hex digits:
