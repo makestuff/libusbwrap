@@ -20,7 +20,7 @@ TYPE    := lib
 SUBDIRS :=
 
 ifeq ($(OS),Windows_NT)
-	LIBUSB_VERSION := 1.2.4.0
+	LIBUSB_VERSION := 1.2.6.0
 	GENEXTRALIBS_REL := echo $(ROOT)/3rd/libusb-win32-bin-$(LIBUSB_VERSION)/lib/msvc/libusb.lib
 	GENEXTRALIBS_DBG := $(GENEXTRALIBS_REL)
 	EXTRA_INCS := -I$(ROOT)/3rd/libusb-win32-bin-$(LIBUSB_VERSION)/include

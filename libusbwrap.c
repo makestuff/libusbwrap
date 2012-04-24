@@ -35,13 +35,20 @@ bool usbValidateVidPid(const char *vp) {
 	if ( vp[4] != ':' ) {
 		return false;
 	}
-	for ( i = 0; i < 9; i++ ) {
+	for ( i = 0; i < 4; i++ ) {
 		ch = vp[i];
-		if ( i == 4 ) {
-			if ( ch != ':' ) {
-				return false;
-			}
-		} else if (
+		if (
+			ch < '0' ||
+			(ch > '9' && ch < 'A') ||
+			(ch > 'F' && ch < 'a') ||
+			ch > 'f')
+		{
+			return false;
+		}
+	}
+	for ( i = 5; i < 9; i++ ) {
+		ch = vp[i];
+		if (
 			ch < '0' ||
 			(ch > '9' && ch < 'A') ||
 			(ch > 'F' && ch < 'a') ||
