@@ -27,7 +27,7 @@
 
 // Return true if vp is VVVV:PPPP where V and P are hex digits:
 //
-bool usbValidateVidPid(const char *vp) {
+DLLEXPORT(bool) usbValidateVidPid(const char *vp) {
 	int i;
 	char ch;
 	if ( !vp ) {
@@ -66,15 +66,22 @@ bool usbValidateVidPid(const char *vp) {
 
 // Initialise USB
 //
-void usbInitialise(void) {
+DLLEXPORT(void) usbInitialise(void) {
 	usb_init();
 }
 
 // Find the descriptor of the first occurance of the specified device
 //
-USBStatus usbIsDeviceAvailable(uint16 vid, uint16 pid, bool *isAvailable, const char **error) {
+DLLEXPORT(int) usbIsDeviceAvailable(const char *vp, bool *isAvailable, const char **error) {
 	struct usb_device *thisDevice;
 	struct usb_bus *bus;
+	uint16 vid, pid;
+	if ( !usbValidateVidPid(vp) ) {
+		errRender(error, "The supplied VID:PID \"%s\" is invalid; it should look like 04B4:8613", vp);
+		return USB_INVALID_VIDPID;
+	}
+	vid = (uint16)strtoul(vp, NULL, 16);
+	pid = (uint16)strtoul(vp+5, NULL, 16);
 	usb_find_busses();
 	bus = usb_get_busses();
 	if ( !bus ) {
@@ -98,8 +105,8 @@ USBStatus usbIsDeviceAvailable(uint16 vid, uint16 pid, bool *isAvailable, const 
 
 // Find the descriptor of the first occurance of the specified device
 //
-USBStatus usbOpenDevice(
-	uint16 vid, uint16 pid, int configuration, int iface, int alternateInterface,
+DLLEXPORT(int) usbOpenDevice(
+	const char *vp, int configuration, int iface, int alternateInterface,
 	struct usb_dev_handle **devHandlePtr, const char **error)
 {
 	USBStatus returnCode;
@@ -107,6 +114,13 @@ USBStatus usbOpenDevice(
 	struct usb_device *thisDevice;
 	struct usb_dev_handle *deviceHandle;
 	int uStatus;
+	uint16 vid, pid;
+	if ( !usbValidateVidPid(vp) ) {
+		errRender(error, "The supplied VID:PID \"%s\" is invalid; it should look like 04B4:8613", vp);
+		return USB_INVALID_VIDPID;
+	}
+	vid = (uint16)strtoul(vp, NULL, 16);
+	pid = (uint16)strtoul(vp+5, NULL, 16);
 	usb_find_busses();
 	bus = usb_get_busses();
 	if ( bus ) {
@@ -165,19 +179,127 @@ cleanup:
 	return returnCode;
 }
 
-// Accept VID:PID as a string
-//
-USBStatus usbOpenDeviceVP(
-	const char *vp, int configuration, int iface, int alternateInterface,
-	struct usb_dev_handle **devHandlePtr, const char **error)
+DLLEXPORT(void) usbCloseDevice(struct usb_dev_handle *dev, int iface) {
+	usb_release_interface(dev, iface);
+	usb_close(dev);
+}
+
+DLLEXPORT(int) usbControlRead(
+	struct usb_dev_handle *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
+	uint8 *data, uint16 wLength,
+	uint32 timeout, const char **error)
 {
-	uint16 vid, pid;
-	if ( !usbValidateVidPid(vp) ) {
-		errRender(error, "The supplied VID:PID \"%s\" is invalid; it should look like 04B4:8613", vp);
-		return USB_INVALID_VIDPID;
+	int returnCode = USB_SUCCESS;
+	int uStatus = usb_control_msg(
+		dev,
+		USB_ENDPOINT_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		bRequest,
+		wValue,
+		wIndex,
+		(char *)data,
+		wLength,
+		timeout
+	);
+	if ( uStatus < 0 ) {
+		errRender(
+			error, "usbControlRead(): %s", usb_strerror());
+		FAIL(uStatus);
+	} else if ( uStatus != wLength ) {
+		errRender(
+			error,
+			"usbControlRead(): expected to read %d bytes but actually read %d",
+			wLength, uStatus
+		);
+		FAIL(USB_CONTROL);
 	}
-	vid = (uint16)strtoul(vp, NULL, 16);
-	pid = (uint16)strtoul(vp+5, NULL, 16);
-	return usbOpenDevice(
-		vid, pid, configuration, iface, alternateInterface, devHandlePtr, error);
+cleanup:
+	return returnCode;
+}
+
+DLLEXPORT(int) usbControlWrite(
+	struct usb_dev_handle *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
+	const uint8 *data, uint16 wLength,
+	uint32 timeout, const char **error)
+{
+	int returnCode = USB_SUCCESS;
+	int uStatus = usb_control_msg(
+		dev,
+		USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		bRequest,
+		wValue,
+		wIndex,
+		(char *)data,
+		wLength,
+		timeout
+	);
+	if ( uStatus < 0 ) {
+		errRender(
+			error, "usbControlWrite(): %s", usb_strerror());
+		FAIL(uStatus);
+	} else if ( uStatus != wLength ) {
+		errRender(
+			error,
+			"usbControlWrite(): expected to write %d bytes but actually wrote %d",
+			wLength, uStatus
+		);
+		FAIL(USB_CONTROL);
+	}
+cleanup:
+	return returnCode;
+}
+
+DLLEXPORT(int) usbBulkRead(
+	struct usb_dev_handle *dev, uint8 endpoint, uint8 *data, uint32 count,
+	uint32 timeout, const char **error)
+{
+	int returnCode = USB_SUCCESS;
+	int uStatus = usb_bulk_read(
+		dev,
+		USB_ENDPOINT_IN | endpoint,
+		(char *)data,
+		count,
+		timeout
+	);
+	if ( uStatus < 0 ) {
+		errRender(
+			error, "usbBulkRead(): %s", usb_strerror());
+		FAIL(uStatus);
+	} else if ( (uint32)uStatus != count ) {
+		errRender(
+			error,
+			"usbBulkRead(): expected to read %d bytes but actually read %d",
+			count, uStatus
+		);
+		FAIL(USB_CONTROL);
+	}
+cleanup:
+	return returnCode;
+}
+
+DLLEXPORT(int) usbBulkWrite(
+	struct usb_dev_handle *dev, uint8 endpoint, const uint8 *data, uint32 count,
+	uint32 timeout, const char **error)
+{
+	int returnCode = USB_SUCCESS;
+	int uStatus = usb_bulk_write(
+		dev,
+		USB_ENDPOINT_OUT | endpoint,
+		(const char *)data,
+		count,
+		timeout
+	);
+	if ( uStatus < 0 ) {
+		errRender(
+			error, "usbBulkWrite(): %s", usb_strerror());
+		FAIL(uStatus);
+	} else if ( (uint32)uStatus != count ) {
+		errRender(
+			error,
+			"usbBulkWrite(): expected to read %d bytes but actually read %d",
+			count, uStatus
+		);
+		FAIL(USB_CONTROL);
+	}
+cleanup:
+	return returnCode;
 }

@@ -16,7 +16,7 @@
 #
 ROOT    := $(realpath ../..)
 DEPS    := error
-TYPE    := lib
+TYPE    := dll
 SUBDIRS :=
 
 ifeq ($(OS),Windows_NT)
@@ -26,8 +26,8 @@ ifeq ($(OS),Windows_NT)
 	EXTRA_INCS := -I$(ROOT)/3rd/libusb-win32-bin-$(LIBUSB_VERSION)/include
 	PRE_BUILD := $(ROOT)/3rd/libusb-win32-bin-$(LIBUSB_VERSION)
 else
-	GENEXTRALIBS_REL := echo -lusb
-	GENEXTRALIBS_DBG := $(GENEXTRALIBS_REL)
+	LINK_EXTRALIBS_REL := -lusb
+	LINK_EXTRALIBS_DBG := $(LINK_EXTRALIBS_REL)
 endif
 
 -include $(ROOT)/common/top.mk

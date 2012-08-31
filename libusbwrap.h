@@ -50,7 +50,8 @@ extern "C" {
 		USB_CANNOT_SET_CONFIGURATION,  ///< Couldn't set the supplied configuration. Does it exist?
 		USB_CANNOT_CLAIM_INTERFACE,    ///< Couldn't claim the supplied interface. Does it exist?
 		USB_CANNOT_SET_ALTINT,         ///< Couldn't set the supplied alternate interface.
-		USB_GET_DESCRIPTOR             ///< Couldn't get the supplied descriptor.
+		USB_GET_DESCRIPTOR,            ///< Couldn't get the supplied descriptor.
+		USB_CONTROL                    ///< A USB control message failed
 	} USBStatus;
 	//@}
 	
@@ -67,7 +68,7 @@ extern "C" {
 	/**
 	 * @brief Initialise LibUSB.
 	 */
-	void usbInitialise(void);
+	DLLEXPORT(void) usbInitialise(void);
 
 	/**
 	 * @brief Determine whether or not the specified device is attached.
@@ -75,8 +76,7 @@ extern "C" {
 	 * Scan the USB buses on the system looking for a device matching the supplied VID:PID. Return
 	 * true as soon as a matching device is found, else return false if a match was not found.
 	 *
-	 * @param vid The Vendor ID to look for.
-	 * @param pid The Product ID to look for.
+	 * @param vp The Vendor ID and Product ID to look for (e.g "04B4:8613").
 	 * @param isAvailable A pointer to a \c bool which will be set on exit to the result of the search.
 	 * @param error A pointer to a <code>char*</code> which will be set on exit to an allocated
 	 *            error message if something goes wrong. Responsibility for this allocated memory
@@ -86,41 +86,10 @@ extern "C" {
 	 * @returns
 	 *     - \c USB_SUCCESS if the operation completed successfully.
 	 *     - \c USB_NO_BUSES if no buses could be found. Did you forget usbInitialise()?
+	 *     - \c USB_INVALID_VIDPID if the supplied VID:PID could not be parsed.
 	 */
-	USBStatus usbIsDeviceAvailable(
-		uint16 vid, uint16 pid, bool *isAvailable, const char **error
-	) WARN_UNUSED_RESULT;
-	
-	/**
-	 * @brief Open a connection to the device matching a numeric VID:PID.
-	 *
-	 * Scan the USB buses on the system looking for a device matching the supplied VID:PID. If found,
-	 * establish a connection to the device and enable the supplied configuration and interface.
-	 *
-	 * @param vid The Vendor ID to look for.
-	 * @param pid The Product ID to look for.
-	 * @param configuration The USB configuration to enable on the device.
-	 * @param iface The USB interface to enable on the device.
-	 * @param alternateInterface The USB alternate interface to choose.
-	 * @param devHandlePtr A pointer to a <code>struct usb_dev_handle*</code> to be set on exit to
-	 *            point to the newly-allocated LibUSB structure.
-	 * @param error A pointer to a <code>char*</code> which will be set on exit to an allocated
-	 *            error message if something goes wrong. Responsibility for this allocated memory
-	 *            passes to the caller and must be freed with \c usbFreeError(). If \c error is
-	 *            \c NULL, no allocation is done and no message is returned, but the return code
-	 *            will still be valid.
-	 * @returns
-	 *     - \c USB_SUCCESS if the operation completed successfully.
-	 *     - \c USB_NO_BUSES if no buses could be found. Did you forget usbInitialise()?
-	 *     - \c USB_DEVICE_NOT_FOUND if a device matching the VID:PID was not found.
-	 *     - \c USB_CANNOT_OPEN_DEVICE if the call to \c usb_open() failed.
-	 *     - \c USB_CANNOT_SET_CONFIGURATION if \c usb_set_configuration() failed.
-	 *     - \c USB_CANNOT_CLAIM_INTERFACE if \c usb_claim_interface() failed.
-	 *     - \c USB_CANNOT_SET_ALTINT if \c usb_set_altinterface() failed.
-	 */
-	USBStatus usbOpenDevice(
-		uint16 vid, uint16 pid, int configuration, int iface, int alternateInterface,
-		struct usb_dev_handle **devHandlePtr, const char **error
+	DLLEXPORT(int) usbIsDeviceAvailable(
+		const char *vp, bool *isAvailable, const char **error
 	) WARN_UNUSED_RESULT;
 	
 	/**
@@ -150,10 +119,19 @@ extern "C" {
 	 *     - \c USB_CANNOT_CLAIM_INTERFACE if \c usb_claim_interface() failed.
 	 *     - \c USB_CANNOT_SET_ALTINT if \c usb_set_altinterface() failed.
 	 */
-	USBStatus usbOpenDeviceVP(
+	DLLEXPORT(int) usbOpenDevice(
 		const char *vp, int configuration, int iface, int alternateInterface,
 		struct usb_dev_handle **devHandlePtr, const char **error
 	) WARN_UNUSED_RESULT;
+
+	/**
+	 * @brief Close a previously-opened device.
+	 *
+	 * @param dev The target device.
+	 * @param iface The interface previously claimed.
+	 */
+	DLLEXPORT(void) usbCloseDevice(struct usb_dev_handle *dev, int iface);
+
 	
 	/**
 	 * @brief Print a human-friendly hierarchical representation of a device's USB configuration.
@@ -168,7 +146,7 @@ extern "C" {
 	 *     - \c USB_SUCCESS if the operation completed successfully.
 	 *     - \c USB_GET_DESCRIPTOR if a referenced descriptor cannot be retrieved from the device.
 	 */
-	USBStatus usbPrintConfiguration(
+	DLLEXPORT(int) usbPrintConfiguration(
 		struct usb_dev_handle *deviceHandle, FILE *stream, const char **error
 	) WARN_UNUSED_RESULT;
 
@@ -181,14 +159,100 @@ extern "C" {
 	 * @param vp The VID:PID to verify.
 	 * @returns \c true if the supplied string is a valid VID:PID.
 	 */
-	bool usbValidateVidPid(const char *vp);
+	DLLEXPORT(bool) usbValidateVidPid(const char *vp);
 
 	/**
 	 * @brief Free an error allocated when one of the other functions fails.
 	 *
 	 * @param err An error message previously allocated by one of the other library functions.
 	 */
-	void usbFreeError(const char *err);
+	DLLEXPORT(void) usbFreeError(const char *err);
+
+	/**
+	 * @brief Read data from the control endpoint.
+	 *
+	 * @param dev The target device.
+	 * @param bRequest The request field for the setup packet.
+	 * @param wValue The value field for the setup packet.
+	 * @param wIndex The index field for the setup packet.
+	 * @param data Suitably-sized buffer for the IN data to be received from the device.
+	 * @param wLength The length field for the setup packet. Buffer should be at least this size.
+	 * @param timeout The timeout in milliseconds.
+	 * @param error A pointer to a <code>char*</code> which will be set on exit to an allocated
+	 *            error message if something goes wrong. Responsibility for this allocated memory
+	 *            passes to the caller and must be freed with \c usbFreeError(). If \c error is
+	 *            \c NULL, no allocation is done and no message is returned, but the return code
+	 *            will still be valid.
+	 * @returns An error code.
+	 */
+	DLLEXPORT(int) usbControlRead(
+		struct usb_dev_handle *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
+		uint8 *data, uint16 wLength,
+		uint32 timeout, const char **error
+	) WARN_UNUSED_RESULT;
+
+	/**
+	 * @brief Write data to the control endpoint.
+	 *
+	 * @param dev The target device.
+	 * @param bRequest The request field for the setup packet.
+	 * @param wValue The value field for the setup packet.
+	 * @param wIndex The index field for the setup packet.
+	 * @param data Suitably-sized buffer containing the OUT data to be sent to the device.
+	 * @param wLength The length field for the setup packet. Buffer should be at least this size.
+	 * @param timeout The timeout in milliseconds.
+	 * @param error A pointer to a <code>char*</code> which will be set on exit to an allocated
+	 *            error message if something goes wrong. Responsibility for this allocated memory
+	 *            passes to the caller and must be freed with \c usbFreeError(). If \c error is
+	 *            \c NULL, no allocation is done and no message is returned, but the return code
+	 *            will still be valid.
+	 * @returns An error code.
+	 */
+	DLLEXPORT(int) usbControlWrite(
+		struct usb_dev_handle *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
+		const uint8 *data, uint16 wLength,
+		uint32 timeout, const char **error
+	) WARN_UNUSED_RESULT;
+
+	/**
+	 * @brief Read data from a bulk endpoint.
+	 *
+	 * @param dev The target device.
+	 * @param endpoint The endpoint to read from.
+	 * @param data Suitably-sized buffer for the IN data to be received from the device.
+	 * @param numBytes The number of bytes to read. Buffer should be at least this size.
+	 * @param timeout The timeout in milliseconds.
+	 * @param error A pointer to a <code>char*</code> which will be set on exit to an allocated
+	 *            error message if something goes wrong. Responsibility for this allocated memory
+	 *            passes to the caller and must be freed with \c usbFreeError(). If \c error is
+	 *            \c NULL, no allocation is done and no message is returned, but the return code
+	 *            will still be valid.
+	 * @returns An error code.
+	 */
+	DLLEXPORT(int) usbBulkRead(
+		struct usb_dev_handle *dev, uint8 endpoint, uint8 *data, uint32 numBytes,
+		uint32 timeout, const char **error
+	) WARN_UNUSED_RESULT;
+
+	/**
+	 * @brief Write data to a bulk endpoint.
+	 *
+	 * @param dev The target device.
+	 * @param endpoint The endpoint to read from.
+	 * @param data Suitably-sized buffer containing the OUT data to be sent to the device.
+	 * @param numBytes The number of bytes to write. Buffer should be at least this size.
+	 * @param timeout The timeout in milliseconds.
+	 * @param error A pointer to a <code>char*</code> which will be set on exit to an allocated
+	 *            error message if something goes wrong. Responsibility for this allocated memory
+	 *            passes to the caller and must be freed with \c usbFreeError(). If \c error is
+	 *            \c NULL, no allocation is done and no message is returned, but the return code
+	 *            will still be valid.
+	 * @returns An error code.
+	 */
+	DLLEXPORT(int) usbBulkWrite(
+		struct usb_dev_handle *dev, uint8 endpoint, const uint8 *data, uint32 numBytes,
+		uint32 timeout, const char **error
+	) WARN_UNUSED_RESULT;
 	//@}
 
 #ifdef __cplusplus

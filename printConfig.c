@@ -25,7 +25,7 @@
 
 // Print out the configuration tree
 //
-USBStatus usbPrintConfiguration(struct usb_dev_handle *deviceHandle, FILE *stream, const char **error) {
+int usbPrintConfiguration(struct usb_dev_handle *deviceHandle, FILE *stream, const char **error) {
 	USBStatus returnCode;
 	char descriptorBuffer[1024];
 	char *ptr = descriptorBuffer;
