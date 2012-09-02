@@ -16,6 +16,6 @@
  */
 #include <liberror.h>
 
-void usbFreeError(const char *err) {
+DLLEXPORT(void) usbFreeError(const char *err) {
 	errFree(err);
 }

@@ -21,8 +21,8 @@ SUBDIRS :=
 
 ifeq ($(OS),Windows_NT)
 	LIBUSB_VERSION := 1.2.6.0
-	GENEXTRALIBS_REL := echo $(ROOT)/3rd/libusb-win32-bin-$(LIBUSB_VERSION)/lib/msvc/libusb.lib
-	GENEXTRALIBS_DBG := $(GENEXTRALIBS_REL)
+	LINK_EXTRALIBS_REL := $(ROOT)/3rd/libusb-win32-bin-$(LIBUSB_VERSION)/lib/msvc/libusb.lib
+	LINK_EXTRALIBS_DBG := $(LINK_EXTRALIBS_REL)
 	EXTRA_INCS := -I$(ROOT)/3rd/libusb-win32-bin-$(LIBUSB_VERSION)/include
 	PRE_BUILD := $(ROOT)/3rd/libusb-win32-bin-$(LIBUSB_VERSION)
 else

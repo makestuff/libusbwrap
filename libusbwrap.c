@@ -284,7 +284,7 @@ DLLEXPORT(int) usbBulkWrite(
 	int uStatus = usb_bulk_write(
 		dev,
 		USB_ENDPOINT_OUT | endpoint,
-		(const char *)data,
+		(char *)data,
 		count,
 		timeout
 	);
