@@ -20,13 +20,13 @@ TYPE    := dll
 SUBDIRS :=
 
 ifeq ($(OS),Windows_NT)
-	LIBUSB_VERSION := 1.2.6.0
-	LINK_EXTRALIBS_REL := $(ROOT)/3rd/libusb-win32-bin-$(LIBUSB_VERSION)/lib/msvc/libusb.lib
+	LIBUSB_VERSION := 1.0.12
+	LINK_EXTRALIBS_REL := $(ROOT)/3rd/libusbx-$(LIBUSB_VERSION)-win/MS32/dll/libusb-1.0.lib
 	LINK_EXTRALIBS_DBG := $(LINK_EXTRALIBS_REL)
-	EXTRA_INCS := -I$(ROOT)/3rd/libusb-win32-bin-$(LIBUSB_VERSION)/include
-	PRE_BUILD := $(ROOT)/3rd/libusb-win32-bin-$(LIBUSB_VERSION)
+	EXTRA_INCS := -I$(ROOT)/3rd/libusbx-$(LIBUSB_VERSION)-win/include
+	PRE_BUILD := $(ROOT)/3rd/libusbx-$(LIBUSB_VERSION)-win
 else
-	LINK_EXTRALIBS_REL := -lusb
+	LINK_EXTRALIBS_REL := -lusb-1.0
 	LINK_EXTRALIBS_DBG := $(LINK_EXTRALIBS_REL)
 endif
 

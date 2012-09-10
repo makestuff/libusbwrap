@@ -16,27 +16,22 @@
  */
 #include <liberror.h>
 #include <stdio.h>
-#ifdef WIN32
-	#include <lusb0_usb.h>
-#else
-	#include <usb.h>
-#endif
-#include "libusbwrap.h"
+#include "private.h"
 
 // Print out the configuration tree
 //
-DLLEXPORT(int) usbPrintConfiguration(struct usb_dev_handle *deviceHandle, FILE *stream, const char **error) {
+DLLEXPORT(int) usbPrintConfiguration(struct USBDevice *deviceHandle, FILE *stream, const char **error) {
 	USBStatus returnCode;
-	char descriptorBuffer[1024];
-	char *ptr = descriptorBuffer;
+	uint8 descriptorBuffer[1024];
+	uint8 *ptr = descriptorBuffer;
 	uint8 endpointNum, interfaceNum;
-	struct usb_config_descriptor *configDesc;
-	struct usb_interface_descriptor *interfaceDesc;
-	struct usb_endpoint_descriptor *endpointDesc;
-	int uStatus = usb_control_msg(
-		deviceHandle,
-		USB_ENDPOINT_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE,
-		USB_REQ_GET_DESCRIPTOR,    // bRequest
+	struct libusb_config_descriptor *configDesc;
+	struct libusb_interface_descriptor *interfaceDesc;
+	struct libusb_endpoint_descriptor *endpointDesc;
+	int uStatus = libusb_control_transfer(
+		unwrap(deviceHandle),
+		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_STANDARD | LIBUSB_RECIPIENT_DEVICE,
+		LIBUSB_REQUEST_GET_DESCRIPTOR,    // bRequest
 		0x0200,                    // wValue
 		0x0000,     // wIndex
 		descriptorBuffer,
@@ -44,10 +39,10 @@ DLLEXPORT(int) usbPrintConfiguration(struct usb_dev_handle *deviceHandle, FILE *
 		5000               // timeout (ms)
 	);
 	if ( uStatus <= 0 ) {
-		errRender(error, "Failed to get descriptor: %s\n", usb_strerror());
-		FAIL(USB_GET_DESCRIPTOR);
+		errRender(error, "Failed to get descriptor: %s\n", libusb_error_name(uStatus));
+		FAIL(USB_CANNOT_GET_DESCRIPTOR);
 	}
-	configDesc = (struct usb_config_descriptor *)ptr;
+	configDesc = (struct libusb_config_descriptor *)ptr;
 	fprintf(
 		stream,
 		"configDescriptor {\n    bLength = 0x%02X\n    bDescriptorType = 0x%02X\n    wTotalLength = 0x%04X\n    bNumInterfaces = 0x%02X\n    bConfigurationValue = 0x%02X\n    iConfiguration = 0x%02X\n    bmAttributes = 0x%02X\n    MaxPower = 0x%02X\n",
@@ -63,7 +58,7 @@ DLLEXPORT(int) usbPrintConfiguration(struct usb_dev_handle *deviceHandle, FILE *
 	ptr += configDesc->bLength;
 	interfaceNum = configDesc->bNumInterfaces;
 	while ( interfaceNum-- ) {
-		interfaceDesc = (struct usb_interface_descriptor *)ptr;
+		interfaceDesc = (struct libusb_interface_descriptor *)ptr;
 		fprintf(
 			stream,
 			"    interfaceDescriptor {\n        bLength = 0x%02X\n        bDescriptorType = 0x%02X\n        bInterfaceNumber = 0x%02X\n        bAlternateSetting = 0x%02X\n        bNumEndpoints = 0x%02X\n        bInterfaceClass = 0x%02X\n        bInterfaceSubClass = 0x%02X\n        bInterfaceProtocol = 0x%02X\n        iInterface = 0x%02X\n",
@@ -80,7 +75,7 @@ DLLEXPORT(int) usbPrintConfiguration(struct usb_dev_handle *deviceHandle, FILE *
 		ptr += interfaceDesc->bLength;			
 		endpointNum = interfaceDesc->bNumEndpoints;
 		while ( endpointNum-- ) {
-			endpointDesc = (struct usb_endpoint_descriptor *)ptr;
+			endpointDesc = (struct libusb_endpoint_descriptor *)ptr;
 			fprintf(
 				stream,
 				"        endpointDescriptor {\n            bLength = 0x%02X\n            bDescriptorType = 0x%02X\n            bEndpointAddress = 0x%02X\n            bmAttributes = 0x%02X\n            wMaxPacketSize = 0x%02X\n            bInterval = 0x%02X\n            bRefresh = 0x%02X\n            bSynchAddress = 0x%02X\n        }\n",

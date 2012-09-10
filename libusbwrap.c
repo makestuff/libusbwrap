@@ -14,16 +14,20 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifdef WIN32
+#include <Windows.h>
+#else
+#define _BSD_SOURCE
+#include <unistd.h>
+#endif
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <makestuff.h>
 #include <liberror.h>
-#ifdef WIN32
-	#include <lusb0_usb.h>
-#else
-	#include <usb.h>
-#endif
-#include "libusbwrap.h"
+#include "private.h"
+
+static libusb_context *m_ctx;
 
 // Return true if vp is VVVV:PPPP where V and P are hex digits:
 //
@@ -67,52 +71,54 @@ DLLEXPORT(bool) usbValidateVidPid(const char *vp) {
 // Initialise USB
 //
 DLLEXPORT(void) usbInitialise(void) {
-	usb_init();
+	printf("usbInitialise()\n");
+	libusb_init(&m_ctx);
+	libusb_set_debug(m_ctx, 4);
 }
+
+#define isMatching (thisDevice->descriptor.idVendor == vid && thisDevice->descriptor.idProduct == pid)
 
 // Find the descriptor of the first occurance of the specified device
 //
 DLLEXPORT(int) usbIsDeviceAvailable(const char *vp, bool *isAvailable, const char **error) {
-	struct usb_device *thisDevice;
-	struct usb_bus *bus;
+	int returnCode = USB_SUCCESS, uStatus;
+	struct libusb_device **devList = NULL;
+	struct libusb_device *thisDev;
+	struct libusb_device_descriptor desc;
 	uint16 vid, pid;
+	int count = libusb_get_device_list(m_ctx, &devList);
 	if ( !usbValidateVidPid(vp) ) {
 		errRender(error, "The supplied VID:PID \"%s\" is invalid; it should look like 04B4:8613", vp);
-		return USB_INVALID_VIDPID;
+		FAIL(USB_INVALID_VIDPID);
 	}
 	vid = (uint16)strtoul(vp, NULL, 16);
 	pid = (uint16)strtoul(vp+5, NULL, 16);
-	usb_find_busses();
-	bus = usb_get_busses();
-	if ( !bus ) {
-		errRender(error, "No USB buses found. Did you forget to call usbInitialise()?");
-		return USB_NO_BUSES;
-	}
-	usb_find_devices();
-	bus = usb_get_busses();
-	do {
-		thisDevice = bus->devices;
-		while ( thisDevice && (thisDevice->descriptor.idVendor != vid ||
-							   thisDevice->descriptor.idProduct != pid) )
-		{
-			thisDevice = thisDevice->next;
+	*isAvailable = false;
+	while ( count-- ) {
+		thisDev = devList[count];
+		uStatus = libusb_get_device_descriptor(thisDev, &desc);
+		if ( uStatus < 0 ) {
+			errRender(error, "usbIsDeviceAvailable(): %s", libusb_error_name(uStatus));
+			FAIL(USB_CANNOT_GET_DESCRIPTOR);
 		}
-		bus = bus->next;
-	} while ( bus && !thisDevice );  // break out if I run out of buses, or device found
-	*isAvailable = thisDevice ? true : false;
-	return USB_SUCCESS;
+		if ( desc.idVendor == vid && desc.idProduct == pid ) {
+			*isAvailable = true;
+			break;
+		}
+	}
+cleanup:
+	libusb_free_device_list(devList, 1);
+	return returnCode;
 }
 
 // Find the descriptor of the first occurance of the specified device
 //
 DLLEXPORT(int) usbOpenDevice(
-	const char *vp, int configuration, int iface, int alternateInterface,
-	struct usb_dev_handle **devHandlePtr, const char **error)
+	const char *vp, int configuration, int iface, int altSetting,
+	struct USBDevice **devHandlePtr, const char **error)
 {
-	USBStatus returnCode;
-	struct usb_bus *bus;
-	struct usb_device *thisDevice;
-	struct usb_dev_handle *deviceHandle;
+	USBStatus returnCode = USB_SUCCESS;
+	struct libusb_device_handle *deviceHandle;
 	int uStatus;
 	uint16 vid, pid;
 	if ( !usbValidateVidPid(vp) ) {
@@ -121,88 +127,73 @@ DLLEXPORT(int) usbOpenDevice(
 	}
 	vid = (uint16)strtoul(vp, NULL, 16);
 	pid = (uint16)strtoul(vp+5, NULL, 16);
-	usb_find_busses();
-	bus = usb_get_busses();
-	if ( bus ) {
-		// This system has one or more USB buses...let's step through them looking for the specified VID/PID
-		//
-		usb_find_devices();
-		do {
-			thisDevice = bus->devices;
-			while ( thisDevice && (thisDevice->descriptor.idVendor != vid || thisDevice->descriptor.idProduct != pid) ) {
-				thisDevice = thisDevice->next;
-			}
-			bus = bus->next;
-		} while ( bus && !thisDevice );  // will break out if I run out of buses, or if device found
-		if ( !thisDevice ) {
-			// The VID/PID was not found after scanning all buses
-			//
-			*devHandlePtr = NULL;
-			errRender(error, "Device %04X:%04X not found", vid, pid);
-			FAIL(USB_DEVICE_NOT_FOUND);
-		} else {
-			// The VID/PID was found; let's see if we can open the device
-			//
-			deviceHandle = usb_open(thisDevice);
-			if ( deviceHandle == NULL ) {
-				*devHandlePtr = NULL;
-				errRender(error, "usb_open(): %s", usb_strerror());
-				FAIL(USB_CANNOT_OPEN_DEVICE);
-			}
-			*devHandlePtr = deviceHandle;  // Return the valid device handle anyway, even if subsequent operations fail
-			uStatus = usb_set_configuration(deviceHandle, configuration);
-			if ( uStatus < 0 ) {
-				errRender(error, "usb_set_configuration(): %s", usb_strerror());
-				FAIL(USB_CANNOT_SET_CONFIGURATION);
-			}
-			uStatus = usb_claim_interface(deviceHandle, iface);
-			if ( uStatus < 0 ) {
-				errRender(error, "usb_claim_interface(): %s", usb_strerror());
-				FAIL(USB_CANNOT_CLAIM_INTERFACE);
-			}
-			if ( alternateInterface ) {
-				uStatus = usb_set_altinterface(deviceHandle, alternateInterface);
-				if ( uStatus < 0 ) {
-					errRender(error, "usb_set_altinterface(): %s", usb_strerror());
-					FAIL(USB_CANNOT_SET_ALTINT);
-				}
-			}
-			return USB_SUCCESS;
-		}
+	deviceHandle = libusb_open_device_with_vid_pid(m_ctx, vid, pid);
+	if ( deviceHandle == NULL ) {
+		*devHandlePtr = NULL;
+		errRender(error, "usbOpenDevice(): libusb_open_device_with_vid_pid() failed");
+		FAIL(USB_CANNOT_OPEN_DEVICE);
 	}
-	// No USB buses on this system!?!?
-	//
-	*devHandlePtr = NULL;
-	errRender(error, "No USB buses found. Did you forget to call usbInitialise()?");
-	returnCode = USB_NO_BUSES;
+	*devHandlePtr = wrap(deviceHandle);  // Return the valid device handle anyway, even if subsequent operations fail
+	uStatus = libusb_set_configuration(deviceHandle, configuration);
+	if ( uStatus < 0 ) {
+		errRender(error, "usbOpenDevice(): %s", libusb_error_name(uStatus));
+		FAIL(USB_CANNOT_SET_CONFIGURATION);
+	}
+	uStatus = libusb_claim_interface(deviceHandle, iface);
+	if ( uStatus < 0 ) {
+		errRender(error, "usbOpenDevice(): %s", libusb_error_name(uStatus));
+		FAIL(USB_CANNOT_CLAIM_INTERFACE);
+	}
+	//if ( altSetting ) {
+		uStatus = libusb_set_interface_alt_setting(deviceHandle, iface, altSetting);
+		if ( uStatus < 0 ) {
+			errRender(error, "usbOpenDevice(): %s", libusb_error_name(uStatus));
+			FAIL(USB_CANNOT_SET_ALTINT);
+		}
+	//}
+	/*uStatus = libusb_control_transfer(
+		deviceHandle,
+		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_STANDARD | LIBUSB_RECIPIENT_INTERFACE,
+		0x0b,
+		(uint16)altSetting,
+		(uint16)iface,
+		NULL,
+		0x0000,
+		5000
+	);
+	if ( uStatus < 0 ) {
+		errRender(
+			error, "usbOpenDevice(): %s", libusb_error_name(uStatus));
+		FAIL(uStatus);
+	}*/
 cleanup:
 	return returnCode;
 }
 
-DLLEXPORT(void) usbCloseDevice(struct usb_dev_handle *dev, int iface) {
-	usb_release_interface(dev, iface);
-	usb_close(dev);
+DLLEXPORT(void) usbCloseDevice(struct USBDevice *dev, int iface) {
+	libusb_release_interface(unwrap(dev), iface);
+	libusb_close(unwrap(dev));
 }
 
 DLLEXPORT(int) usbControlRead(
-	struct usb_dev_handle *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
+	struct USBDevice *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
 	uint8 *data, uint16 wLength,
 	uint32 timeout, const char **error)
 {
 	int returnCode = USB_SUCCESS;
-	int uStatus = usb_control_msg(
-		dev,
-		USB_ENDPOINT_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+	int uStatus = libusb_control_transfer(
+		unwrap(dev),
+		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
 		bRequest,
 		wValue,
 		wIndex,
-		(char *)data,
+		(uint8 *)data,
 		wLength,
 		timeout
 	);
 	if ( uStatus < 0 ) {
 		errRender(
-			error, "usbControlRead(): %s", usb_strerror());
+			error, "usbControlRead(): %s", libusb_error_name(uStatus));
 		FAIL(uStatus);
 	} else if ( uStatus != wLength ) {
 		errRender(
@@ -217,24 +208,24 @@ cleanup:
 }
 
 DLLEXPORT(int) usbControlWrite(
-	struct usb_dev_handle *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
+	struct USBDevice *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
 	const uint8 *data, uint16 wLength,
 	uint32 timeout, const char **error)
 {
 	int returnCode = USB_SUCCESS;
-	int uStatus = usb_control_msg(
-		dev,
-		USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+	int uStatus = libusb_control_transfer(
+		unwrap(dev),
+		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
 		bRequest,
 		wValue,
 		wIndex,
-		(char *)data,
+		(uint8 *)data,
 		wLength,
 		timeout
 	);
 	if ( uStatus < 0 ) {
 		errRender(
-			error, "usbControlWrite(): %s", usb_strerror());
+			error, "usbControlWrite(): %s", libusb_error_name(uStatus));
 		FAIL(uStatus);
 	} else if ( uStatus != wLength ) {
 		errRender(
@@ -249,27 +240,34 @@ cleanup:
 }
 
 DLLEXPORT(int) usbBulkRead(
-	struct usb_dev_handle *dev, uint8 endpoint, uint8 *data, uint32 count,
+	struct USBDevice *dev, uint8 endpoint, uint8 *data, uint32 count,
 	uint32 timeout, const char **error)
 {
 	int returnCode = USB_SUCCESS;
-	int uStatus = usb_bulk_read(
-		dev,
-		USB_ENDPOINT_IN | endpoint,
-		(char *)data,
+	int numRead;
+	int uStatus = libusb_bulk_transfer(
+		unwrap(dev),
+		LIBUSB_ENDPOINT_IN | endpoint,
+		(uint8 *)data,
 		count,
+		&numRead,
 		timeout
 	);
 	if ( uStatus < 0 ) {
 		errRender(
-			error, "usbBulkRead(): %s", usb_strerror());
+			error, "usbBulkRead(): %s", libusb_error_name(uStatus));
 		FAIL(uStatus);
-	} else if ( (uint32)uStatus != count ) {
+	} else if ( (uint32)numRead != count ) {
 		errRender(
 			error,
-			"usbBulkRead(): expected to read %d bytes but actually read %d",
-			count, uStatus
+			"usbBulkRead(): expected to read %d bytes but actually read %d (uStatus = %d): %s",
+			count, numRead, uStatus, libusb_error_name(uStatus)
 		);
+		//#ifdef WIN32
+		//	Sleep(5000);
+		//#else
+		//	usleep(5000000);
+		//#endif
 		FAIL(USB_CONTROL);
 	}
 cleanup:
@@ -277,26 +275,28 @@ cleanup:
 }
 
 DLLEXPORT(int) usbBulkWrite(
-	struct usb_dev_handle *dev, uint8 endpoint, const uint8 *data, uint32 count,
+	struct USBDevice *dev, uint8 endpoint, const uint8 *data, uint32 count,
 	uint32 timeout, const char **error)
 {
 	int returnCode = USB_SUCCESS;
-	int uStatus = usb_bulk_write(
-		dev,
-		USB_ENDPOINT_OUT | endpoint,
-		(char *)data,
+	int numWritten;
+	int uStatus = libusb_bulk_transfer(
+		unwrap(dev),
+		LIBUSB_ENDPOINT_OUT | endpoint,
+		(uint8 *)data,
 		count,
+		&numWritten,
 		timeout
 	);
 	if ( uStatus < 0 ) {
 		errRender(
-			error, "usbBulkWrite(): %s", usb_strerror());
+			error, "usbBulkWrite(): %s", libusb_error_name(uStatus));
 		FAIL(uStatus);
-	} else if ( (uint32)uStatus != count ) {
+	} else if ( (uint32)numWritten != count ) {
 		errRender(
 			error,
 			"usbBulkWrite(): expected to read %d bytes but actually read %d",
-			count, uStatus
+			count, numWritten
 		);
 		FAIL(USB_CONTROL);
 	}

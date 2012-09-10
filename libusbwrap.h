@@ -50,13 +50,13 @@ extern "C" {
 		USB_CANNOT_SET_CONFIGURATION,  ///< Couldn't set the supplied configuration. Does it exist?
 		USB_CANNOT_CLAIM_INTERFACE,    ///< Couldn't claim the supplied interface. Does it exist?
 		USB_CANNOT_SET_ALTINT,         ///< Couldn't set the supplied alternate interface.
-		USB_GET_DESCRIPTOR,            ///< Couldn't get the supplied descriptor.
+		USB_CANNOT_GET_DESCRIPTOR,     ///< Couldn't get the supplied descriptor.
 		USB_CONTROL                    ///< A USB control message failed
 	} USBStatus;
 	//@}
 	
 	// Forward-declaration of the LibUSB handle
-	struct usb_dev_handle;
+	struct USBDevice;
 	
 	// ---------------------------------------------------------------------------------------------
 	// Functions
@@ -102,7 +102,7 @@ extern "C" {
 	 * @param configuration The USB configuration to enable on the device.
 	 * @param iface The USB interface to enable on the device.
 	 * @param alternateInterface The USB alternate interface to choose.
-	 * @param devHandlePtr A pointer to a <code>struct usb_dev_handle*</code> to be set on exit to
+	 * @param devHandlePtr A pointer to a <code>struct USBDevice*</code> to be set on exit to
 	 *            point to the newly-allocated LibUSB structure.
 	 * @param error A pointer to a <code>char*</code> which will be set on exit to an allocated
 	 *            error message if something goes wrong. Responsibility for this allocated memory
@@ -121,7 +121,7 @@ extern "C" {
 	 */
 	DLLEXPORT(int) usbOpenDevice(
 		const char *vp, int configuration, int iface, int alternateInterface,
-		struct usb_dev_handle **devHandlePtr, const char **error
+		struct USBDevice **devHandlePtr, const char **error
 	) WARN_UNUSED_RESULT;
 
 	/**
@@ -130,7 +130,7 @@ extern "C" {
 	 * @param dev The target device.
 	 * @param iface The interface previously claimed.
 	 */
-	DLLEXPORT(void) usbCloseDevice(struct usb_dev_handle *dev, int iface);
+	DLLEXPORT(void) usbCloseDevice(struct USBDevice *dev, int iface);
 
 	
 	/**
@@ -147,7 +147,7 @@ extern "C" {
 	 *     - \c USB_GET_DESCRIPTOR if a referenced descriptor cannot be retrieved from the device.
 	 */
 	DLLEXPORT(int) usbPrintConfiguration(
-		struct usb_dev_handle *deviceHandle, FILE *stream, const char **error
+		struct USBDevice *deviceHandle, FILE *stream, const char **error
 	) WARN_UNUSED_RESULT;
 
 	/**
@@ -186,7 +186,7 @@ extern "C" {
 	 * @returns An error code.
 	 */
 	DLLEXPORT(int) usbControlRead(
-		struct usb_dev_handle *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
+		struct USBDevice *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
 		uint8 *data, uint16 wLength,
 		uint32 timeout, const char **error
 	) WARN_UNUSED_RESULT;
@@ -209,7 +209,7 @@ extern "C" {
 	 * @returns An error code.
 	 */
 	DLLEXPORT(int) usbControlWrite(
-		struct usb_dev_handle *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
+		struct USBDevice *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
 		const uint8 *data, uint16 wLength,
 		uint32 timeout, const char **error
 	) WARN_UNUSED_RESULT;
@@ -230,7 +230,7 @@ extern "C" {
 	 * @returns An error code.
 	 */
 	DLLEXPORT(int) usbBulkRead(
-		struct usb_dev_handle *dev, uint8 endpoint, uint8 *data, uint32 numBytes,
+		struct USBDevice *dev, uint8 endpoint, uint8 *data, uint32 numBytes,
 		uint32 timeout, const char **error
 	) WARN_UNUSED_RESULT;
 
@@ -250,7 +250,7 @@ extern "C" {
 	 * @returns An error code.
 	 */
 	DLLEXPORT(int) usbBulkWrite(
-		struct usb_dev_handle *dev, uint8 endpoint, const uint8 *data, uint32 numBytes,
+		struct USBDevice *dev, uint8 endpoint, const uint8 *data, uint32 numBytes,
 		uint32 timeout, const char **error
 	) WARN_UNUSED_RESULT;
 	//@}
