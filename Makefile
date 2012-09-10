@@ -24,7 +24,7 @@ ifeq ($(OS),Windows_NT)
 	LINK_EXTRALIBS_REL := $(ROOT)/3rd/libusbx-$(LIBUSB_VERSION)-win/MS32/dll/libusb-1.0.lib
 	LINK_EXTRALIBS_DBG := $(LINK_EXTRALIBS_REL)
 	EXTRADLLS_REL := $(ROOT)/3rd/libusbx-$(LIBUSB_VERSION)-win/MS32/dll/libusb-1.0.dll
-	EXTRADLLS_DBG := $(EXTRA_DLLS_REL)
+	EXTRADLLS_DBG := $(EXTRADLLS_REL)
 	EXTRA_INCS := -I$(ROOT)/3rd/libusbx-$(LIBUSB_VERSION)-win/include
 	PRE_BUILD := $(ROOT)/3rd/libusbx-$(LIBUSB_VERSION)-win
 else
