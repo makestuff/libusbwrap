@@ -71,7 +71,6 @@ DLLEXPORT(bool) usbValidateVidPid(const char *vp) {
 // Initialise USB
 //
 DLLEXPORT(void) usbInitialise(void) {
-	printf("usbInitialise()\n");
 	libusb_init(&m_ctx);
 	libusb_set_debug(m_ctx, 4);
 }
