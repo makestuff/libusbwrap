@@ -44,6 +44,7 @@ extern "C" {
 	typedef enum {
 		USB_SUCCESS = 0,               ///< The operation completed successfully.
 		USB_INVALID_VIDPID,            ///< The VID:PID could not be parsed.
+		USB_INIT,                      ///< LibUSB failed to initialise.
 		USB_NO_BUSES,                  ///< Did you forget to call \c usbInitialise()?
 		USB_DEVICE_NOT_FOUND,          ///< The specified device is not connected.
 		USB_CANNOT_OPEN_DEVICE,        ///< The call to \c usb_open() failed.
@@ -66,9 +67,23 @@ extern "C" {
 	 * @{
 	 */	
 	/**
-	 * @brief Initialise LibUSB.
+	 * @brief Initialise LibUSB with the given log-level.
+	 *
+	 * This may fail if LibUSB cannot talk to the USB host controllers through its kernel driver.
+	 *
+	 * @param debugLevel 0->none, 1, 2, 3->lots.
+	 * @param error A pointer to a <code>char*</code> which will be set on exit to an allocated
+	 *            error message if something goes wrong. Responsibility for this allocated memory
+	 *            passes to the caller and must be freed with \c usbFreeError(). If \c error is
+	 *            \c NULL, no allocation is done and no message is returned, but the return code
+	 *            will still be valid.
+	 * @returns
+	 *     - \c USB_SUCCESS if the operation completed successfully.
+	 *     - \c USB_INIT if there were problems initialising LibUSB.
 	 */
-	DLLEXPORT(void) usbInitialise(void);
+	DLLEXPORT(int) usbInitialise(
+		int debugLevel, const char **error
+	) WARN_UNUSED_RESULT;
 
 	/**
 	 * @brief Determine whether or not the specified device is attached.

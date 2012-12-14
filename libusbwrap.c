@@ -68,11 +68,17 @@ DLLEXPORT(bool) usbValidateVidPid(const char *vp) {
 	return true;
 }
 
-// Initialise USB
+// Initialise LibUSB with the given log level.
 //
-DLLEXPORT(void) usbInitialise(void) {
-	libusb_init(&m_ctx);
-	libusb_set_debug(m_ctx, 4);
+DLLEXPORT(int) usbInitialise(int debugLevel, const char **error) {
+	int returnCode = libusb_init(&m_ctx);
+	if ( returnCode ) {
+		errRender(error, "usbInitialise(): %s", libusb_error_name(returnCode));
+		FAIL(USB_INIT);
+	}
+	libusb_set_debug(m_ctx, debugLevel);
+cleanup:
+	return returnCode;
 }
 
 #define isMatching (thisDevice->descriptor.idVendor == vid && thisDevice->descriptor.idProduct == pid)
