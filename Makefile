@@ -20,7 +20,7 @@ TYPE    := dll
 SUBDIRS :=
 
 ifeq ($(OS),Windows_NT)
-	LIBUSB_VERSION := 1.0.12
+	LIBUSB_VERSION := 1.0.14
 	ifdef PROCESSOR_ARCHITEW6432
 		LINK_EXTRALIBS_REL := $(ROOT)/3rd/libusbx-$(LIBUSB_VERSION)-win/MS64/dll/libusb-1.0.lib
 		EXTRADLLS_REL := $(ROOT)/3rd/libusbx-$(LIBUSB_VERSION)-win/MS64/dll/libusb-1.0.dll
