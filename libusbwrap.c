@@ -29,18 +29,73 @@
 
 static libusb_context *m_ctx;
 
+// Modified from libusb_open_device_with_vid_pid in core.c of libusbx
+//
+static libusb_device_handle *libusbOpenWithVidPid(
+	libusb_context *ctx, uint16 vid, uint16 pid, uint16 did, const char **error)
+{
+	struct libusb_device **devs;
+	struct libusb_device *found = NULL;
+	struct libusb_device *dev;
+	struct libusb_device_handle *handle = NULL;
+	size_t i = 0;
+	int uStatus = libusb_get_device_list(ctx, &devs);
+	if ( uStatus < 0 ) {
+		errRender(error, "%s", libusb_error_name(uStatus));
+		return NULL;
+	}
+	dev = devs[i++];
+	while ( dev ) {
+		struct libusb_device_descriptor desc;
+		uStatus = libusb_get_device_descriptor(dev, &desc);
+		if ( uStatus < 0 ) {
+			errRender(error, "%s", libusb_error_name(uStatus));
+			goto cleanup;
+		}
+		if (
+			desc.idVendor == vid &&
+			desc.idProduct == pid &&
+			(did == 0x0000 || desc.bcdDevice == did)
+		) {
+			found = dev;
+			break;
+		}
+		dev = devs[i++];
+	}
+
+	if ( found ) {
+		uStatus = libusb_open(found, &handle);
+		if ( uStatus < 0 ) {
+			errRender(error, "%s", libusb_error_name(uStatus));
+			handle = NULL;
+		}
+	} else {
+		errRender(error, "device not found");
+	}
+
+cleanup:
+	libusb_free_device_list(devs, 1);
+	return handle;
+}
+
 // Return true if vp is VVVV:PPPP where V and P are hex digits:
 //
 DLLEXPORT(bool) usbValidateVidPid(const char *vp) {
 	int i;
 	char ch;
+	const size_t len = strlen(vp);
+	bool hasDID;
 	if ( !vp ) {
 		return false;
 	}
-	if ( strlen(vp) != 9 ) {
+	if ( len == 9 ) {
+		hasDID = false;
+	} else if ( len == 14 ) {
+		hasDID = true;
+	} else {
 		return false;
 	}
-	if ( vp[4] != ':' ) {
+	if ( vp[4] != ':' || (hasDID && vp[9] != ':') ) {
 		return false;
 	}
 	for ( i = 0; i < 4; i++ ) {
@@ -65,6 +120,19 @@ DLLEXPORT(bool) usbValidateVidPid(const char *vp) {
 			return false;
 		}
 	}
+	if ( hasDID ) {
+		for ( i = 10; i < 14; i++ ) {
+			ch = vp[i];
+			if (
+				ch < '0' ||
+				(ch > '9' && ch < 'A') ||
+				(ch > 'F' && ch < 'a') ||
+				ch > 'f')
+			{
+				return false;
+			}
+		}
+	}
 	return true;
 }
 
@@ -83,6 +151,8 @@ cleanup:
 
 #define isMatching (thisDevice->descriptor.idVendor == vid && thisDevice->descriptor.idProduct == pid)
 
+#define FORMAT_ERR "The supplied VID:PID \"%s\" is invalid; it should look like HHHH:HHHH or HHHH:HHHH:DDDD where H is a hex digit and D is a decimal digit"
+
 // Find the descriptor of the first occurance of the specified device
 //
 DLLEXPORT(int) usbIsDeviceAvailable(const char *vp, bool *isAvailable, const char **error) {
@@ -90,14 +160,19 @@ DLLEXPORT(int) usbIsDeviceAvailable(const char *vp, bool *isAvailable, const cha
 	struct libusb_device **devList = NULL;
 	struct libusb_device *thisDev;
 	struct libusb_device_descriptor desc;
-	uint16 vid, pid;
+	uint16 vid, pid, did;
 	int count = libusb_get_device_list(m_ctx, &devList);
+	if ( count < 0 ) {
+		errRender(error, "usbIsDeviceAvailable(): %s", libusb_error_name(count));
+		FAIL(USB_CANNOT_OPEN_DEVICE);
+	}
 	if ( !usbValidateVidPid(vp) ) {
-		errRender(error, "The supplied VID:PID \"%s\" is invalid; it should look like 04B4:8613", vp);
+		errRender(error, FORMAT_ERR, vp);
 		FAIL(USB_INVALID_VIDPID);
 	}
 	vid = (uint16)strtoul(vp, NULL, 16);
 	pid = (uint16)strtoul(vp+5, NULL, 16);
+	did = (strlen(vp) == 14) ? (uint16)strtoul(vp+10, NULL, 16) : 0x0000;
 	*isAvailable = false;
 	while ( count-- ) {
 		thisDev = devList[count];
@@ -106,7 +181,11 @@ DLLEXPORT(int) usbIsDeviceAvailable(const char *vp, bool *isAvailable, const cha
 			errRender(error, "usbIsDeviceAvailable(): %s", libusb_error_name(uStatus));
 			FAIL(USB_CANNOT_GET_DESCRIPTOR);
 		}
-		if ( desc.idVendor == vid && desc.idProduct == pid ) {
+		if (
+			desc.idVendor == vid &&
+			desc.idProduct == pid &&
+			(did == 0x0000 || desc.bcdDevice == did)
+		) {
 			*isAvailable = true;
 			break;
 		}
@@ -125,19 +204,21 @@ DLLEXPORT(int) usbOpenDevice(
 	USBStatus returnCode = USB_SUCCESS;
 	struct libusb_device_handle *deviceHandle;
 	int uStatus;
-	uint16 vid, pid;
+	uint16 vid, pid, did;
 	if ( !usbValidateVidPid(vp) ) {
-		errRender(error, "The supplied VID:PID \"%s\" is invalid; it should look like 04B4:8613", vp);
+		errRender(error, FORMAT_ERR, vp);
 		return USB_INVALID_VIDPID;
 	}
 	vid = (uint16)strtoul(vp, NULL, 16);
 	pid = (uint16)strtoul(vp+5, NULL, 16);
-	deviceHandle = libusb_open_device_with_vid_pid(m_ctx, vid, pid);
-	if ( deviceHandle == NULL ) {
-		*devHandlePtr = NULL;
-		errRender(error, "usbOpenDevice(): libusb_open_device_with_vid_pid() failed");
+	did = (strlen(vp) == 14) ? (uint16)strtoul(vp+10, NULL, 16) : 0x0000;
+	*devHandlePtr = NULL;
+	deviceHandle = libusbOpenWithVidPid(m_ctx, vid, pid, did, error);
+	if ( !deviceHandle ) {
+		errPrefix(error, "usbOpenDevice()");
 		FAIL(USB_CANNOT_OPEN_DEVICE);
 	}
+	//CHECK_STATUS((!deviceHandle), "usbOpenDevice()", USB_CANNOT_OPEN_DEVICE);
 	*devHandlePtr = wrap(deviceHandle);  // Return the valid device handle anyway, even if subsequent operations fail
 	uStatus = libusb_set_configuration(deviceHandle, configuration);
 	if ( uStatus < 0 ) {
