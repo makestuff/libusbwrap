@@ -151,7 +151,7 @@ cleanup:
 
 #define isMatching (thisDevice->descriptor.idVendor == vid && thisDevice->descriptor.idProduct == pid)
 
-#define FORMAT_ERR "The supplied VID:PID \"%s\" is invalid; it should look like HHHH:HHHH or HHHH:HHHH:DDDD where H is a hex digit and D is a decimal digit"
+#define FORMAT_ERR "The supplied VID:PID:DID \"%s\" is invalid; it should look like 1D50:602B or 1D50:602B:0001"
 
 // Find the descriptor of the first occurance of the specified device
 //
