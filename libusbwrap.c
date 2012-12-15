@@ -39,7 +39,7 @@ static libusb_device_handle *libusbOpenWithVidPid(
 	struct libusb_device *dev;
 	struct libusb_device_handle *handle = NULL;
 	size_t i = 0;
-	int uStatus = libusb_get_device_list(ctx, &devs);
+	int uStatus = (int)libusb_get_device_list(ctx, &devs);
 	if ( uStatus < 0 ) {
 		errRender(error, "%s", libusb_error_name(uStatus));
 		return NULL;
@@ -161,7 +161,7 @@ DLLEXPORT(int) usbIsDeviceAvailable(const char *vp, bool *isAvailable, const cha
 	struct libusb_device *thisDev;
 	struct libusb_device_descriptor desc;
 	uint16 vid, pid, did;
-	int count = libusb_get_device_list(m_ctx, &devList);
+	int count = (int)libusb_get_device_list(m_ctx, &devList);
 	if ( count < 0 ) {
 		errRender(error, "usbIsDeviceAvailable(): %s", libusb_error_name(count));
 		FAIL(USB_CANNOT_OPEN_DEVICE);
