@@ -268,6 +268,16 @@ extern "C" {
 		struct USBDevice *dev, uint8 endpoint, const uint8 *data, uint32 numBytes,
 		uint32 timeout, const char **error
 	) WARN_UNUSED_RESULT;
+
+	struct libusb_context;
+
+	/**
+	 * @brief Get this application's context.
+	 * 
+	 * @returns This application's context.
+	 */
+	DLLEXPORT(struct libusb_context *) usbGetContext(void);
+
 	//@}
 
 #ifdef __cplusplus

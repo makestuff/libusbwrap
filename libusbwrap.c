@@ -27,7 +27,7 @@
 #include <liberror.h>
 #include "private.h"
 
-static libusb_context *m_ctx;
+static struct libusb_context *m_ctx = NULL;
 
 // Modified from libusb_open_device_with_vid_pid in core.c of libusbx
 //
@@ -381,11 +381,15 @@ DLLEXPORT(int) usbBulkWrite(
 	} else if ( (uint32)numWritten != count ) {
 		errRender(
 			error,
-			"usbBulkWrite(): expected to read %d bytes but actually read %d",
+			"usbBulkWrite(): expected to write %d bytes but actually wrote %d",
 			count, numWritten
 		);
 		FAIL(USB_CONTROL);
 	}
 cleanup:
 	return returnCode;
+}
+
+DLLEXPORT(struct libusb_context *) usbGetContext(void) {
+	return m_ctx;
 }
