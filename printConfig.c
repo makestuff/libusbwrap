@@ -20,28 +20,27 @@
 
 // Print out the configuration tree
 //
-DLLEXPORT(int) usbPrintConfiguration(struct USBDevice *deviceHandle, FILE *stream, const char **error) {
-	USBStatus returnCode;
+DLLEXPORT(USBStatus) usbPrintConfiguration(struct USBDevice *deviceHandle, FILE *stream, const char **error) {
+	USBStatus retVal = USB_SUCCESS;
 	uint8 descriptorBuffer[1024];
 	uint8 *ptr = descriptorBuffer;
 	uint8 endpointNum, interfaceNum;
 	struct libusb_config_descriptor *configDesc;
 	struct libusb_interface_descriptor *interfaceDesc;
 	struct libusb_endpoint_descriptor *endpointDesc;
-	int uStatus = libusb_control_transfer(
+	int status = libusb_control_transfer(
 		unwrap(deviceHandle),
 		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_STANDARD | LIBUSB_RECIPIENT_DEVICE,
-		LIBUSB_REQUEST_GET_DESCRIPTOR,    // bRequest
-		0x0200,                    // wValue
-		0x0000,     // wIndex
+		LIBUSB_REQUEST_GET_DESCRIPTOR,  // bRequest
+		0x0200,                         // wValue
+		0x0000,                         // wIndex
 		descriptorBuffer,
-		256,                 // wLength
-		5000               // timeout (ms)
+		256,                            // wLength
+		5000                            // timeout (ms)
 	);
-	if ( uStatus <= 0 ) {
-		errRender(error, "Failed to get descriptor: %s\n", libusb_error_name(uStatus));
-		FAIL(USB_CANNOT_GET_DESCRIPTOR);
-	}
+	CHECK_STATUS(
+		status <= 0, USB_CANNOT_GET_DESCRIPTOR, cleanup,
+		"Failed to get descriptor: %s", libusb_error_name(status));
 	configDesc = (struct libusb_config_descriptor *)ptr;
 	fprintf(
 		stream,
@@ -93,7 +92,6 @@ DLLEXPORT(int) usbPrintConfiguration(struct USBDevice *deviceHandle, FILE *strea
 		fprintf(stream, "    }\n");
 	}
 	fprintf(stream, "}\n");
-	return USB_SUCCESS;
 cleanup:
-	return returnCode;
+	return retVal;
 }

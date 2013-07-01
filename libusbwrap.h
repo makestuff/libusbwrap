@@ -52,7 +52,8 @@ extern "C" {
 		USB_CANNOT_CLAIM_INTERFACE,    ///< Couldn't claim the supplied interface. Does it exist?
 		USB_CANNOT_SET_ALTINT,         ///< Couldn't set the supplied alternate interface.
 		USB_CANNOT_GET_DESCRIPTOR,     ///< Couldn't get the supplied descriptor.
-		USB_CONTROL                    ///< A USB control message failed
+		USB_CONTROL,                   ///< A USB control message failed
+		USB_BULK                       ///< A USB bulk read or write failed
 	} USBStatus;
 	//@}
 	
@@ -81,7 +82,7 @@ extern "C" {
 	 *     - \c USB_SUCCESS if the operation completed successfully.
 	 *     - \c USB_INIT if there were problems initialising LibUSB.
 	 */
-	DLLEXPORT(int) usbInitialise(
+	DLLEXPORT(USBStatus) usbInitialise(
 		int debugLevel, const char **error
 	) WARN_UNUSED_RESULT;
 
@@ -103,7 +104,7 @@ extern "C" {
 	 *     - \c USB_NO_BUSES if no buses could be found. Did you forget usbInitialise()?
 	 *     - \c USB_INVALID_VIDPID if the supplied VID:PID could not be parsed.
 	 */
-	DLLEXPORT(int) usbIsDeviceAvailable(
+	DLLEXPORT(USBStatus) usbIsDeviceAvailable(
 		const char *vp, bool *isAvailable, const char **error
 	) WARN_UNUSED_RESULT;
 	
@@ -134,7 +135,7 @@ extern "C" {
 	 *     - \c USB_CANNOT_CLAIM_INTERFACE if \c usb_claim_interface() failed.
 	 *     - \c USB_CANNOT_SET_ALTINT if \c usb_set_altinterface() failed.
 	 */
-	DLLEXPORT(int) usbOpenDevice(
+	DLLEXPORT(USBStatus) usbOpenDevice(
 		const char *vp, int configuration, int iface, int alternateInterface,
 		struct USBDevice **devHandlePtr, const char **error
 	) WARN_UNUSED_RESULT;
@@ -161,7 +162,7 @@ extern "C" {
 	 *     - \c USB_SUCCESS if the operation completed successfully.
 	 *     - \c USB_GET_DESCRIPTOR if a referenced descriptor cannot be retrieved from the device.
 	 */
-	DLLEXPORT(int) usbPrintConfiguration(
+	DLLEXPORT(USBStatus) usbPrintConfiguration(
 		struct USBDevice *deviceHandle, FILE *stream, const char **error
 	) WARN_UNUSED_RESULT;
 
@@ -200,7 +201,7 @@ extern "C" {
 	 *            will still be valid.
 	 * @returns An error code.
 	 */
-	DLLEXPORT(int) usbControlRead(
+	DLLEXPORT(USBStatus) usbControlRead(
 		struct USBDevice *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
 		uint8 *data, uint16 wLength,
 		uint32 timeout, const char **error
@@ -223,7 +224,7 @@ extern "C" {
 	 *            will still be valid.
 	 * @returns An error code.
 	 */
-	DLLEXPORT(int) usbControlWrite(
+	DLLEXPORT(USBStatus) usbControlWrite(
 		struct USBDevice *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
 		const uint8 *data, uint16 wLength,
 		uint32 timeout, const char **error
@@ -244,7 +245,7 @@ extern "C" {
 	 *            will still be valid.
 	 * @returns An error code.
 	 */
-	DLLEXPORT(int) usbBulkRead(
+	DLLEXPORT(USBStatus) usbBulkRead(
 		struct USBDevice *dev, uint8 endpoint, uint8 *data, uint32 numBytes,
 		uint32 timeout, const char **error
 	) WARN_UNUSED_RESULT;
@@ -264,7 +265,7 @@ extern "C" {
 	 *            will still be valid.
 	 * @returns An error code.
 	 */
-	DLLEXPORT(int) usbBulkWrite(
+	DLLEXPORT(USBStatus) usbBulkWrite(
 		struct USBDevice *dev, uint8 endpoint, const uint8 *data, uint32 numBytes,
 		uint32 timeout, const char **error
 	) WARN_UNUSED_RESULT;

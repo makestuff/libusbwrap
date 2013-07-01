@@ -34,24 +34,18 @@ static struct libusb_context *m_ctx = NULL;
 static libusb_device_handle *libusbOpenWithVidPid(
 	libusb_context *ctx, uint16 vid, uint16 pid, uint16 did, const char **error)
 {
+	static libusb_device_handle *retVal = NULL;
 	struct libusb_device **devs;
 	struct libusb_device *found = NULL;
 	struct libusb_device *dev;
-	struct libusb_device_handle *handle = NULL;
 	size_t i = 0;
-	int uStatus = (int)libusb_get_device_list(ctx, &devs);
-	if ( uStatus < 0 ) {
-		errRender(error, "%s", libusb_error_name(uStatus));
-		return NULL;
-	}
+	int status = (int)libusb_get_device_list(ctx, &devs);
+	CHECK_STATUS(status < 0, NULL, cleanup, libusb_error_name(status));
 	dev = devs[i++];
 	while ( dev ) {
 		struct libusb_device_descriptor desc;
-		uStatus = libusb_get_device_descriptor(dev, &desc);
-		if ( uStatus < 0 ) {
-			errRender(error, "%s", libusb_error_name(uStatus));
-			goto cleanup;
-		}
+		status = libusb_get_device_descriptor(dev, &desc);
+		CHECK_STATUS(status < 0, NULL, cleanup, libusb_error_name(status));
 		if (
 			desc.idVendor == vid &&
 			desc.idProduct == pid &&
@@ -64,18 +58,15 @@ static libusb_device_handle *libusbOpenWithVidPid(
 	}
 
 	if ( found ) {
-		uStatus = libusb_open(found, &handle);
-		if ( uStatus < 0 ) {
-			errRender(error, "%s", libusb_error_name(uStatus));
-			handle = NULL;
-		}
+		status = libusb_open(found, &retVal);
+		CHECK_STATUS(status < 0, NULL, cleanup, libusb_error_name(status));
 	} else {
 		errRender(error, "device not found");
 	}
 
 cleanup:
 	libusb_free_device_list(devs, 1);
-	return handle;
+	return retVal;
 }
 
 // Return true if vp is VVVV:PPPP where V and P are hex digits:
@@ -138,15 +129,13 @@ DLLEXPORT(bool) usbValidateVidPid(const char *vp) {
 
 // Initialise LibUSB with the given log level.
 //
-DLLEXPORT(int) usbInitialise(int debugLevel, const char **error) {
-	int returnCode = libusb_init(&m_ctx);
-	if ( returnCode ) {
-		errRender(error, "usbInitialise(): %s", libusb_error_name(returnCode));
-		FAIL(USB_INIT);
-	}
+DLLEXPORT(USBStatus) usbInitialise(int debugLevel, const char **error) {
+	USBStatus retVal = USB_SUCCESS;
+	int status = libusb_init(&m_ctx);
+	CHECK_STATUS(status, USB_INIT, cleanup, "usbInitialise(): %s", libusb_error_name(status));
 	libusb_set_debug(m_ctx, debugLevel);
 cleanup:
-	return returnCode;
+	return retVal;
 }
 
 #define isMatching (thisDevice->descriptor.idVendor == vid && thisDevice->descriptor.idProduct == pid)
@@ -155,32 +144,29 @@ cleanup:
 
 // Find the descriptor of the first occurance of the specified device
 //
-DLLEXPORT(int) usbIsDeviceAvailable(const char *vp, bool *isAvailable, const char **error) {
-	int returnCode = USB_SUCCESS, uStatus;
+DLLEXPORT(USBStatus) usbIsDeviceAvailable(const char *vp, bool *isAvailable, const char **error) {
+	USBStatus retVal = USB_SUCCESS;
 	struct libusb_device **devList = NULL;
 	struct libusb_device *thisDev;
 	struct libusb_device_descriptor desc;
 	uint16 vid, pid, did;
-	int count = (int)libusb_get_device_list(m_ctx, &devList);
-	if ( count < 0 ) {
-		errRender(error, "usbIsDeviceAvailable(): %s", libusb_error_name(count));
-		FAIL(USB_CANNOT_OPEN_DEVICE);
-	}
-	if ( !usbValidateVidPid(vp) ) {
-		errRender(error, FORMAT_ERR, vp);
-		FAIL(USB_INVALID_VIDPID);
-	}
+	int status, count = (int)libusb_get_device_list(m_ctx, &devList);
+	CHECK_STATUS(
+		count < 0, USB_CANNOT_OPEN_DEVICE, cleanup,
+		"usbIsDeviceAvailable(): %s", libusb_error_name(count));
+	CHECK_STATUS(
+		!usbValidateVidPid(vp), USB_INVALID_VIDPID, cleanup,
+		"usbIsDeviceAvailable(): "FORMAT_ERR, vp);
 	vid = (uint16)strtoul(vp, NULL, 16);
 	pid = (uint16)strtoul(vp+5, NULL, 16);
-	did = (strlen(vp) == 14) ? (uint16)strtoul(vp+10, NULL, 16) : 0x0000;
+	did = (uint16)((strlen(vp) == 14) ? strtoul(vp+10, NULL, 16) : 0x0000);
 	*isAvailable = false;
 	while ( count-- ) {
 		thisDev = devList[count];
-		uStatus = libusb_get_device_descriptor(thisDev, &desc);
-		if ( uStatus < 0 ) {
-			errRender(error, "usbIsDeviceAvailable(): %s", libusb_error_name(uStatus));
-			FAIL(USB_CANNOT_GET_DESCRIPTOR);
-		}
+		status = libusb_get_device_descriptor(thisDev, &desc);
+		CHECK_STATUS(
+			status, USB_CANNOT_GET_DESCRIPTOR, cleanup,
+			"usbIsDeviceAvailable(): %s", libusb_error_name(status));
 		if (
 			desc.idVendor == vid &&
 			desc.idProduct == pid &&
@@ -192,68 +178,43 @@ DLLEXPORT(int) usbIsDeviceAvailable(const char *vp, bool *isAvailable, const cha
 	}
 cleanup:
 	libusb_free_device_list(devList, 1);
-	return returnCode;
+	return retVal;
 }
 
 // Find the descriptor of the first occurance of the specified device
 //
-DLLEXPORT(int) usbOpenDevice(
+DLLEXPORT(USBStatus) usbOpenDevice(
 	const char *vp, int configuration, int iface, int altSetting,
 	struct USBDevice **devHandlePtr, const char **error)
 {
-	USBStatus returnCode = USB_SUCCESS;
+	USBStatus retVal = USB_SUCCESS;
 	struct libusb_device_handle *deviceHandle;
-	int uStatus;
 	uint16 vid, pid, did;
-	if ( !usbValidateVidPid(vp) ) {
-		errRender(error, FORMAT_ERR, vp);
-		return USB_INVALID_VIDPID;
-	}
+	int status;
+	CHECK_STATUS(
+		!usbValidateVidPid(vp), USB_INVALID_VIDPID, cleanup,
+		"usbOpenDevice(): "FORMAT_ERR, vp);
 	vid = (uint16)strtoul(vp, NULL, 16);
 	pid = (uint16)strtoul(vp+5, NULL, 16);
-	did = (strlen(vp) == 14) ? (uint16)strtoul(vp+10, NULL, 16) : 0x0000;
+	did = (uint16)((strlen(vp) == 14) ? strtoul(vp+10, NULL, 16) : 0x0000);
 	*devHandlePtr = NULL;
 	deviceHandle = libusbOpenWithVidPid(m_ctx, vid, pid, did, error);
-	if ( !deviceHandle ) {
-		errPrefix(error, "usbOpenDevice()");
-		FAIL(USB_CANNOT_OPEN_DEVICE);
-	}
-	//CHECK_STATUS((!deviceHandle), "usbOpenDevice()", USB_CANNOT_OPEN_DEVICE);
+	CHECK_STATUS(!deviceHandle, USB_CANNOT_OPEN_DEVICE, cleanup, "usbOpenDevice()");
 	*devHandlePtr = wrap(deviceHandle);  // Return the valid device handle anyway, even if subsequent operations fail
-	uStatus = libusb_set_configuration(deviceHandle, configuration);
-	if ( uStatus < 0 ) {
-		errRender(error, "usbOpenDevice(): %s", libusb_error_name(uStatus));
-		FAIL(USB_CANNOT_SET_CONFIGURATION);
-	}
-	uStatus = libusb_claim_interface(deviceHandle, iface);
-	if ( uStatus < 0 ) {
-		errRender(error, "usbOpenDevice(): %s", libusb_error_name(uStatus));
-		FAIL(USB_CANNOT_CLAIM_INTERFACE);
-	}
-	//if ( altSetting ) {
-		uStatus = libusb_set_interface_alt_setting(deviceHandle, iface, altSetting);
-		if ( uStatus < 0 ) {
-			errRender(error, "usbOpenDevice(): %s", libusb_error_name(uStatus));
-			FAIL(USB_CANNOT_SET_ALTINT);
-		}
-	//}
-	/*uStatus = libusb_control_transfer(
-		deviceHandle,
-		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_STANDARD | LIBUSB_RECIPIENT_INTERFACE,
-		0x0b,
-		(uint16)altSetting,
-		(uint16)iface,
-		NULL,
-		0x0000,
-		5000
-	);
-	if ( uStatus < 0 ) {
-		errRender(
-			error, "usbOpenDevice(): %s", libusb_error_name(uStatus));
-		FAIL(uStatus);
-	}*/
+	status = libusb_set_configuration(deviceHandle, configuration);
+	CHECK_STATUS(
+		status < 0, USB_CANNOT_SET_CONFIGURATION, cleanup,
+		"usbOpenDevice(): %s", libusb_error_name(status));
+	status = libusb_claim_interface(deviceHandle, iface);
+	CHECK_STATUS(
+		status < 0, USB_CANNOT_CLAIM_INTERFACE, cleanup,
+		"usbOpenDevice(): %s", libusb_error_name(status));
+	status = libusb_set_interface_alt_setting(deviceHandle, iface, altSetting);
+	CHECK_STATUS(
+		status < 0, USB_CANNOT_SET_ALTINT, cleanup,
+		"usbOpenDevice(): %s", libusb_error_name(status));
 cleanup:
-	return returnCode;
+	return retVal;
 }
 
 DLLEXPORT(void) usbCloseDevice(struct USBDevice *dev, int iface) {
@@ -261,13 +222,13 @@ DLLEXPORT(void) usbCloseDevice(struct USBDevice *dev, int iface) {
 	libusb_close(unwrap(dev));
 }
 
-DLLEXPORT(int) usbControlRead(
+DLLEXPORT(USBStatus) usbControlRead(
 	struct USBDevice *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
 	uint8 *data, uint16 wLength,
 	uint32 timeout, const char **error)
 {
-	int returnCode = USB_SUCCESS;
-	int uStatus = libusb_control_transfer(
+	USBStatus retVal = USB_SUCCESS;
+	int status = libusb_control_transfer(
 		unwrap(dev),
 		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
 		bRequest,
@@ -277,29 +238,23 @@ DLLEXPORT(int) usbControlRead(
 		wLength,
 		timeout
 	);
-	if ( uStatus < 0 ) {
-		errRender(
-			error, "usbControlRead(): %s", libusb_error_name(uStatus));
-		FAIL(uStatus);
-	} else if ( uStatus != wLength ) {
-		errRender(
-			error,
-			"usbControlRead(): expected to read %d bytes but actually read %d",
-			wLength, uStatus
-		);
-		FAIL(USB_CONTROL);
-	}
+	CHECK_STATUS(
+		status < 0, USB_CONTROL, cleanup,
+		"usbControlRead(): %s", libusb_error_name(status));
+	CHECK_STATUS(
+		status != wLength, USB_CONTROL, cleanup,
+		"usbControlRead(): expected to read %d bytes but actually read %d", wLength, status);
 cleanup:
-	return returnCode;
+	return retVal;
 }
 
-DLLEXPORT(int) usbControlWrite(
+DLLEXPORT(USBStatus) usbControlWrite(
 	struct USBDevice *dev, uint8 bRequest, uint16 wValue, uint16 wIndex,
 	const uint8 *data, uint16 wLength,
 	uint32 timeout, const char **error)
 {
-	int returnCode = USB_SUCCESS;
-	int uStatus = libusb_control_transfer(
+	USBStatus retVal = USB_SUCCESS;
+	int status = libusb_control_transfer(
 		unwrap(dev),
 		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
 		bRequest,
@@ -309,85 +264,64 @@ DLLEXPORT(int) usbControlWrite(
 		wLength,
 		timeout
 	);
-	if ( uStatus < 0 ) {
-		errRender(
-			error, "usbControlWrite(): %s", libusb_error_name(uStatus));
-		FAIL(uStatus);
-	} else if ( uStatus != wLength ) {
-		errRender(
-			error,
-			"usbControlWrite(): expected to write %d bytes but actually wrote %d",
-			wLength, uStatus
-		);
-		FAIL(USB_CONTROL);
-	}
+	CHECK_STATUS(
+		status < 0, USB_CONTROL, cleanup,
+		"usbControlWrite(): %s", libusb_error_name(status));
+	CHECK_STATUS(
+		status != wLength, USB_CONTROL, cleanup,
+		"usbControlWrite(): expected to write %d bytes but actually wrote %d", wLength, status);
 cleanup:
-	return returnCode;
+	return retVal;
 }
 
-DLLEXPORT(int) usbBulkRead(
+DLLEXPORT(USBStatus) usbBulkRead(
 	struct USBDevice *dev, uint8 endpoint, uint8 *data, uint32 count,
 	uint32 timeout, const char **error)
 {
-	int returnCode = USB_SUCCESS;
+	USBStatus retVal = USB_SUCCESS;
 	int numRead;
-	int uStatus = libusb_bulk_transfer(
+	int status = libusb_bulk_transfer(
 		unwrap(dev),
 		LIBUSB_ENDPOINT_IN | endpoint,
 		(uint8 *)data,
-		count,
+		(int)count,
 		&numRead,
 		timeout
 	);
-	if ( uStatus < 0 ) {
-		errRender(
-			error, "usbBulkRead(): %s", libusb_error_name(uStatus));
-		FAIL(uStatus);
-	} else if ( (uint32)numRead != count ) {
-		errRender(
-			error,
-			"usbBulkRead(): expected to read %d bytes but actually read %d (uStatus = %d): %s",
-			count, numRead, uStatus, libusb_error_name(uStatus)
-		);
-		//#ifdef WIN32
-		//	Sleep(5000);
-		//#else
-		//	usleep(5000000);
-		//#endif
-		FAIL(USB_CONTROL);
-	}
+	CHECK_STATUS(
+		status < 0, USB_BULK, cleanup,
+		"usbBulkRead(): %s", libusb_error_name(status));
+	CHECK_STATUS(
+		(uint32)numRead != count, USB_BULK, cleanup,
+		"usbBulkRead(): expected to read %d bytes but actually read %d (status = %d): %s",
+		count, numRead, status, libusb_error_name(status));
 cleanup:
-	return returnCode;
+	return retVal;
 }
 
-DLLEXPORT(int) usbBulkWrite(
+DLLEXPORT(USBStatus) usbBulkWrite(
 	struct USBDevice *dev, uint8 endpoint, const uint8 *data, uint32 count,
 	uint32 timeout, const char **error)
 {
-	int returnCode = USB_SUCCESS;
+	USBStatus retVal = USB_SUCCESS;
 	int numWritten;
-	int uStatus = libusb_bulk_transfer(
+	int status = libusb_bulk_transfer(
 		unwrap(dev),
 		LIBUSB_ENDPOINT_OUT | endpoint,
 		(uint8 *)data,
-		count,
+		(int)count,
 		&numWritten,
 		timeout
 	);
-	if ( uStatus < 0 ) {
-		errRender(
-			error, "usbBulkWrite(): %s", libusb_error_name(uStatus));
-		FAIL(uStatus);
-	} else if ( (uint32)numWritten != count ) {
-		errRender(
-			error,
-			"usbBulkWrite(): expected to write %d bytes but actually wrote %d",
-			count, numWritten
-		);
-		FAIL(USB_CONTROL);
-	}
+	CHECK_STATUS(
+		status < 0, USB_BULK, cleanup,
+		"usbBulkWrite(): %s", libusb_error_name(status));
+	CHECK_STATUS(
+		(uint32)numWritten != count, USB_BULK, cleanup,
+		"usbBulkWrite(): expected to write %d bytes but actually wrote %d (status = %d): %s",
+		count, numWritten, status, libusb_error_name(status));
 cleanup:
-	return returnCode;
+	return retVal;
 }
 
 DLLEXPORT(struct libusb_context *) usbGetContext(void) {
