@@ -181,6 +181,31 @@ cleanup:
 	return retVal;
 }
 
+struct TransferWrapper {
+	struct libusb_transfer *transfer;
+	int completed;
+	struct AsyncTransferFlags flags;
+	uint8 buffer[0x10000];
+};
+struct TransferWrapper *createTransfer(void) {
+	struct TransferWrapper *retVal = (struct TransferWrapper *)calloc(1, sizeof(struct TransferWrapper));
+	CHECK_STATUS(retVal == NULL, NULL, exit);
+	retVal->transfer = libusb_alloc_transfer(0);
+	CHECK_STATUS(retVal->transfer == NULL, NULL, freeWrap);
+	return retVal;
+freeWrap:
+	free((void*)retVal);
+exit:
+	return NULL;
+}
+
+void destroyTransfer(struct TransferWrapper *tx) {
+	if ( tx ) {
+		libusb_free_transfer(tx->transfer);
+		free((void*)tx);
+	}
+}
+
 // Find the descriptor of the first occurance of the specified device
 //
 DLLEXPORT(USBStatus) usbOpenDevice(
@@ -188,38 +213,58 @@ DLLEXPORT(USBStatus) usbOpenDevice(
 	struct USBDevice **devHandlePtr, const char **error)
 {
 	USBStatus retVal = USB_SUCCESS;
-	struct libusb_device_handle *deviceHandle;
 	uint16 vid, pid, did;
 	int status;
+	struct USBDevice *newWrapper;
+	struct libusb_device_handle *newHandle;
 	CHECK_STATUS(
-		!usbValidateVidPid(vp), USB_INVALID_VIDPID, cleanup,
+		!usbValidateVidPid(vp), USB_INVALID_VIDPID, exit,
 		"usbOpenDevice(): "FORMAT_ERR, vp);
 	vid = (uint16)strtoul(vp, NULL, 16);
 	pid = (uint16)strtoul(vp+5, NULL, 16);
 	did = (uint16)((strlen(vp) == 14) ? strtoul(vp+10, NULL, 16) : 0x0000);
+	newWrapper = (struct USBDevice *)malloc(sizeof(struct USBDevice));
+	CHECK_STATUS(newWrapper == NULL, USB_ALLOC_ERR, exit, "usbOpenDevice(): Out of memory!");
+	status = queueInit(&newWrapper->queue, 4, (CreateFunc)createTransfer, (DestroyFunc)destroyTransfer);
+	CHECK_STATUS(status, USB_ALLOC_ERR, freeWrap, "usbOpenDevice(): Out of memory!");
+	newHandle = libusbOpenWithVidPid(m_ctx, vid, pid, did, error);
+	CHECK_STATUS(!newHandle, USB_CANNOT_OPEN_DEVICE, freeQueue, "usbOpenDevice()");
+	status = libusb_set_configuration(newHandle, configuration);
+	CHECK_STATUS(
+		status < 0, USB_CANNOT_SET_CONFIGURATION, closeDev,
+		"usbOpenDevice(): %s", libusb_error_name(status));
+	status = libusb_claim_interface(newHandle, iface);
+	CHECK_STATUS(
+		status < 0, USB_CANNOT_CLAIM_INTERFACE, closeDev,
+		"usbOpenDevice(): %s", libusb_error_name(status));
+	status = libusb_set_interface_alt_setting(newHandle, iface, altSetting);
+	CHECK_STATUS(
+		status < 0, USB_CANNOT_SET_ALTINT, release,
+		"usbOpenDevice(): %s", libusb_error_name(status));
+	newWrapper->handle = newHandle;	
+	*devHandlePtr = newWrapper;
+	return USB_SUCCESS;
+release:
+	libusb_release_interface(newHandle, iface);
+closeDev:
+	libusb_close(newHandle);	
+freeQueue:
+	queueDestroy(&newWrapper->queue);
+freeWrap:
+	free((void*)newWrapper);
+exit:
 	*devHandlePtr = NULL;
-	deviceHandle = libusbOpenWithVidPid(m_ctx, vid, pid, did, error);
-	CHECK_STATUS(!deviceHandle, USB_CANNOT_OPEN_DEVICE, cleanup, "usbOpenDevice()");
-	*devHandlePtr = wrap(deviceHandle);  // Return the valid device handle anyway, even if subsequent operations fail
-	status = libusb_set_configuration(deviceHandle, configuration);
-	CHECK_STATUS(
-		status < 0, USB_CANNOT_SET_CONFIGURATION, cleanup,
-		"usbOpenDevice(): %s", libusb_error_name(status));
-	status = libusb_claim_interface(deviceHandle, iface);
-	CHECK_STATUS(
-		status < 0, USB_CANNOT_CLAIM_INTERFACE, cleanup,
-		"usbOpenDevice(): %s", libusb_error_name(status));
-	status = libusb_set_interface_alt_setting(deviceHandle, iface, altSetting);
-	CHECK_STATUS(
-		status < 0, USB_CANNOT_SET_ALTINT, cleanup,
-		"usbOpenDevice(): %s", libusb_error_name(status));
-cleanup:
 	return retVal;
 }
 
 DLLEXPORT(void) usbCloseDevice(struct USBDevice *dev, int iface) {
-	libusb_release_interface(unwrap(dev), iface);
-	libusb_close(unwrap(dev));
+	if ( dev ) {
+		struct libusb_device_handle *ptr = dev->handle;
+		libusb_release_interface(ptr, iface);
+		libusb_close(ptr);
+		queueDestroy(&dev->queue);
+		free((void*)dev);
+	}
 }
 
 DLLEXPORT(USBStatus) usbControlRead(
@@ -229,7 +274,7 @@ DLLEXPORT(USBStatus) usbControlRead(
 {
 	USBStatus retVal = USB_SUCCESS;
 	int status = libusb_control_transfer(
-		unwrap(dev),
+		dev->handle,
 		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
 		bRequest,
 		wValue,
@@ -255,7 +300,7 @@ DLLEXPORT(USBStatus) usbControlWrite(
 {
 	USBStatus retVal = USB_SUCCESS;
 	int status = libusb_control_transfer(
-		unwrap(dev),
+		dev->handle,
 		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
 		bRequest,
 		wValue,
@@ -281,9 +326,9 @@ DLLEXPORT(USBStatus) usbBulkRead(
 	USBStatus retVal = USB_SUCCESS;
 	int numRead;
 	int status = libusb_bulk_transfer(
-		unwrap(dev),
+		dev->handle,
 		LIBUSB_ENDPOINT_IN | endpoint,
-		(uint8 *)data,
+		data,
 		(int)count,
 		&numRead,
 		timeout
@@ -306,7 +351,7 @@ DLLEXPORT(USBStatus) usbBulkWrite(
 	USBStatus retVal = USB_SUCCESS;
 	int numWritten;
 	int status = libusb_bulk_transfer(
-		unwrap(dev),
+		dev->handle,
 		LIBUSB_ENDPOINT_OUT | endpoint,
 		(uint8 *)data,
 		(int)count,
@@ -326,4 +371,160 @@ cleanup:
 
 DLLEXPORT(struct libusb_context *) usbGetContext(void) {
 	return m_ctx;
+}
+
+static void bulk_transfer_cb(struct libusb_transfer *transfer) {
+	int *completed = transfer->user_data;
+	*completed = 1;
+}
+
+DLLEXPORT(int) bulkWriteAsync(
+	struct USBDevice *dev, uint8 endpoint, const uint8 *buffer, uint32 length, uint32 timeout)
+{
+	int retVal = 0;
+	struct TransferWrapper *wrapper;
+	struct libusb_transfer *transfer;
+	int *completed;
+	int status = queuePut(&dev->queue, (Item*)&wrapper);
+	CHECK_STATUS(status, status, cleanup);
+	transfer = wrapper->transfer;
+	completed = &wrapper->completed;
+	*completed = 0;
+	wrapper->flags.isRead = 0;
+	libusb_fill_bulk_transfer(
+		transfer, dev->handle, LIBUSB_ENDPOINT_OUT | endpoint, (uint8 *)buffer, (int)length,
+		bulk_transfer_cb, completed, timeout
+	);
+	transfer->type = LIBUSB_TRANSFER_TYPE_BULK;
+	status = libusb_submit_transfer(transfer);
+	CHECK_STATUS(status, status, cleanup);
+	queueCommitPut(&dev->queue);
+cleanup:
+	return retVal;
+}
+
+DLLEXPORT(int) bulkWriteAsyncPrepare(struct USBDevice *dev, uint8 **buffer) {
+	int retVal = 0;
+	struct TransferWrapper *wrapper;
+	int status = queuePut(&dev->queue, (Item*)&wrapper);
+	CHECK_STATUS(status, status, cleanup);
+	*buffer = wrapper->buffer;
+cleanup:
+	return retVal;
+}
+
+DLLEXPORT(int) bulkWriteAsyncSubmit(
+	struct USBDevice *dev, uint8 endpoint, uint32 length, uint32 timeout)
+{
+	int retVal = 0;
+	struct TransferWrapper *wrapper;
+	struct libusb_transfer *transfer;
+	int *completed;
+	int status;
+	CHECK_STATUS(length > 0x10000, -1, cleanup);
+	status = queuePut(&dev->queue, (Item*)&wrapper);
+	CHECK_STATUS(status, status, cleanup);
+	transfer = wrapper->transfer;
+	completed = &wrapper->completed;
+	*completed = 0;
+	wrapper->flags.isRead = 0;
+	libusb_fill_bulk_transfer(
+		transfer, dev->handle, LIBUSB_ENDPOINT_OUT | endpoint, wrapper->buffer, (int)length,
+		bulk_transfer_cb, completed, timeout
+	);
+	transfer->type = LIBUSB_TRANSFER_TYPE_BULK;
+	status = libusb_submit_transfer(transfer);
+	CHECK_STATUS(status, status, cleanup);
+	queueCommitPut(&dev->queue);
+cleanup:
+	return retVal;
+}
+
+DLLEXPORT(int) bulkReadAsync(
+	struct USBDevice *dev, uint8 endpoint, uint32 length, uint32 timeout)
+{
+	int retVal = 0;
+	struct TransferWrapper *wrapper;
+	struct libusb_transfer *transfer;
+	uint8 *buffer;
+	int *completed;
+	int status;
+	CHECK_STATUS(length > 0x10000, -1, cleanup);
+	status = queuePut(&dev->queue, (Item*)&wrapper);
+	CHECK_STATUS(status, status, cleanup);
+	transfer = wrapper->transfer;
+	completed = &wrapper->completed;
+	*completed = 0;
+	wrapper->flags.isRead = 1;
+	buffer = wrapper->buffer;
+	libusb_fill_bulk_transfer(
+		transfer, dev->handle, LIBUSB_ENDPOINT_IN | endpoint, buffer, (int)length,
+		bulk_transfer_cb, completed, timeout
+	);
+	transfer->type = LIBUSB_TRANSFER_TYPE_BULK;
+	status = libusb_submit_transfer(transfer);
+	CHECK_STATUS(status, status, cleanup);
+	queueCommitPut(&dev->queue);
+cleanup:
+	return retVal;
+}
+
+DLLEXPORT(int) bulkAwaitCompletion(struct USBDevice *dev, struct CompletionReport *report) {
+	int retVal = 0;
+	struct TransferWrapper *wrapper;
+	struct libusb_transfer *transfer;
+	int *completed;
+	int status = queueTake(&dev->queue, (Item*)&wrapper);
+	CHECK_STATUS(status, status, exit);
+	transfer = wrapper->transfer;
+	completed = &wrapper->completed;
+	while ( *completed == 0 ) {
+		status = libusb_handle_events_completed(m_ctx, completed);
+		if ( status < 0 ) {
+			if ( status == LIBUSB_ERROR_INTERRUPTED ) {
+				continue;
+			}
+			if ( libusb_cancel_transfer(transfer) == LIBUSB_SUCCESS ) {
+				while ( *completed == 0 ) {
+					if ( libusb_handle_events_completed(m_ctx, completed) < 0 ) {
+						break;
+					}
+				}
+			}
+			FAIL(status, commit);
+		}
+	}
+
+	report->buffer = transfer->buffer;
+	report->requestLength = (uint32)transfer->length;
+	report->actualLength = (uint32)transfer->actual_length;
+	report->flags = wrapper->flags;
+
+	switch ( transfer->status ) {
+	case LIBUSB_TRANSFER_COMPLETED:
+		retVal = 0;
+		break;
+	case LIBUSB_TRANSFER_TIMED_OUT:
+		retVal = LIBUSB_ERROR_TIMEOUT;
+		break;
+	case LIBUSB_TRANSFER_STALL:
+		retVal = LIBUSB_ERROR_PIPE;
+		break;
+	case LIBUSB_TRANSFER_OVERFLOW:
+		retVal = LIBUSB_ERROR_OVERFLOW;
+		break;
+	case LIBUSB_TRANSFER_NO_DEVICE:
+		retVal = LIBUSB_ERROR_NO_DEVICE;
+		break;
+	case LIBUSB_TRANSFER_ERROR:
+	case LIBUSB_TRANSFER_CANCELLED:
+		retVal = LIBUSB_ERROR_IO;
+		break;
+	default:
+		retVal = LIBUSB_ERROR_OTHER;
+	}
+commit:
+	queueCommitTake(&dev->queue);
+exit:
+	return retVal;
 }

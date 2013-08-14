@@ -17,7 +17,7 @@
 ROOT    := $(realpath ../..)
 DEPS    := error
 TYPE    := dll
-SUBDIRS :=
+SUBDIRS := tests example
 
 ifeq ($(OS),Windows_NT)
 	LIBUSB_VERSION := 1.0.14

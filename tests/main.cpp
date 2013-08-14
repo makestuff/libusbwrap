@@ -14,29 +14,8 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <UnitTest++.h>
 
-#ifndef PRIVATE_H
-#define PRIVATE_H
-
-#include "libusbwrap.h"
-#include "unbounded_queue.h"
-#ifdef WIN32
-	#include <libusbx-1.0/libusb.h>
-#else
-	#include <libusb-1.0/libusb.h>
-#endif
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-	struct USBDevice {
-		struct libusb_device_handle *handle;
-		struct UnboundedQueue queue;
-	};
-
-#ifdef __cplusplus
+int main() {
+	return UnitTest::RunAllTests();
 }
-#endif
-
-#endif

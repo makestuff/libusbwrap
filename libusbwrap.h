@@ -53,12 +53,24 @@ extern "C" {
 		USB_CANNOT_SET_ALTINT,         ///< Couldn't set the supplied alternate interface.
 		USB_CANNOT_GET_DESCRIPTOR,     ///< Couldn't get the supplied descriptor.
 		USB_CONTROL,                   ///< A USB control message failed
-		USB_BULK                       ///< A USB bulk read or write failed
+		USB_BULK,                      ///< A USB bulk read or write failed
+		USB_ALLOC_ERR                  ///< An allocation failed
 	} USBStatus;
 	//@}
 	
 	// Forward-declaration of the LibUSB handle
 	struct USBDevice;
+
+	struct AsyncTransferFlags {
+		uint32 isRead : 1;
+	};		
+
+	struct CompletionReport {
+		const uint8 *buffer;
+		uint32 requestLength;
+		uint32 actualLength;
+		struct AsyncTransferFlags flags;
+	};
 	
 	// ---------------------------------------------------------------------------------------------
 	// Functions
@@ -278,6 +290,27 @@ extern "C" {
 	 * @returns This application's context.
 	 */
 	DLLEXPORT(struct libusb_context *) usbGetContext(void);
+
+	// Caller supplies the buffer
+	DLLEXPORT(int) bulkWriteAsync(
+		struct USBDevice *dev, uint8 endpoint, const uint8 *buffer, uint32 length, uint32 timeout
+	) WARN_UNUSED_RESULT;
+
+	// Library gives the caller a buffer to use
+	DLLEXPORT(int) bulkWriteAsyncPrepare(
+		struct USBDevice *dev, uint8 **buffer
+	) WARN_UNUSED_RESULT;
+	DLLEXPORT(int) bulkWriteAsyncSubmit(
+		struct USBDevice *dev, uint8 endpoint, uint32 length, uint32 timeout
+	) WARN_UNUSED_RESULT;
+
+	DLLEXPORT(int) bulkReadAsync(
+		struct USBDevice *dev, uint8 endpoint, uint32 length, uint32 timeout
+	) WARN_UNUSED_RESULT;
+
+	DLLEXPORT(int) bulkAwaitCompletion(
+		struct USBDevice *dev, struct CompletionReport *report
+	) WARN_UNUSED_RESULT;
 
 	//@}
 
