@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <libusbwrap.h>
 #ifdef WIN32
@@ -129,20 +130,14 @@ cleanup:
 	return retVal;
 }
 
-int multiRead(void) {
+int multiRead(uint32 reqCount, uint32 reqSize, double *speed) {
 	int retVal = 0, uStatus;
 	struct USBDevice *deviceHandle = NULL;
 	const char *error = NULL;
-	const uint8 buf[] = {
-		0x80,
-		(uint8)(CHUNK_SIZE >> 24),
-		(uint8)(CHUNK_SIZE >> 16),
-		(uint8)(CHUNK_SIZE >> 8),
-		(uint8)(CHUNK_SIZE & 0xFF)
-	};
+	uint8 buf[5];
 	struct CompletionReport completionReport;
-	uint32 i, numBytes;
-	double totalTime, speed;
+	uint32 numBytes;
+	double totalTime;
 	#ifdef WIN32
 		LARGE_INTEGER tvStart, tvEnd, freq;
 		DWORD_PTR mask = 1;
@@ -152,6 +147,13 @@ int multiRead(void) {
 		struct timeval tvStart, tvEnd;
 		long long startTime, endTime;
 	#endif
+
+	// We can make one FPGA request message and re-use it
+	buf[0] = 0x80;  // write ch0
+	buf[1] = (uint8)(reqSize >> 24);
+	buf[2] = (uint8)(reqSize >> 16);
+	buf[3] = (uint8)(reqSize >> 8);
+	buf[4] = (uint8)(reqSize & 0xFF);
 
 	// Init library
 	uStatus = usbInitialise(0, &error);
@@ -175,18 +177,17 @@ int multiRead(void) {
 	// Send a couple of read commands to the FPGA
 	uStatus = bulkWriteAsync(deviceHandle, 2, buf, 5, 9000);  // Write request command
 	CHECK_STATUS(uStatus, 5, cleanup);
-	uStatus = bulkReadAsync(deviceHandle, 6, CHUNK_SIZE, 9000);  // Read response data
+	uStatus = bulkReadAsync(deviceHandle, 6, reqSize, 9000);  // Read response data
 	CHECK_STATUS(uStatus, 5, cleanup);
 
 	uStatus = bulkWriteAsync(deviceHandle, 2, buf, 5, 9000);  // Write request command
 	CHECK_STATUS(uStatus, 5, cleanup);
-	uStatus = bulkReadAsync(deviceHandle, 6, CHUNK_SIZE, 9000);  // Read response data
+	uStatus = bulkReadAsync(deviceHandle, 6, reqSize, 9000);  // Read response data
 	CHECK_STATUS(uStatus, 5, cleanup);
 
 	// On each iteration, await completion and send a new read command
-	i = 100;
-	numBytes = (i+2)*CHUNK_SIZE;
-	while ( i-- ) {
+	numBytes = (reqCount+2)*reqSize;
+	while ( reqCount-- ) {
 		uStatus = bulkAwaitCompletion(deviceHandle, &completionReport);
 		CHECK_STATUS(uStatus, 100, cleanup);
 		printCompletionReport(&completionReport);
@@ -196,7 +197,7 @@ int multiRead(void) {
 		
 		uStatus = bulkWriteAsync(deviceHandle, 2, buf, 5, 9000);  // Write request command
 		CHECK_STATUS(uStatus, 5, cleanup);
-		uStatus = bulkReadAsync(deviceHandle, 6, CHUNK_SIZE, 9000);  // Read response data
+		uStatus = bulkReadAsync(deviceHandle, 6, reqSize, 9000);  // Read response data
 		CHECK_STATUS(uStatus, 5, cleanup);
 	}
 
@@ -220,7 +221,7 @@ int multiRead(void) {
 		QueryPerformanceCounter(&tvEnd);
 		totalTime = (double)(tvEnd.QuadPart - tvStart.QuadPart);
 		totalTime /= freq.QuadPart;
-		speed = (double)numBytes / (1024*1024*totalTime);
+		*speed = (double)numBytes / (1024*1024*totalTime);
 	#else
 		gettimeofday(&tvEnd, NULL);
 		startTime = tvStart.tv_sec;
@@ -231,11 +232,8 @@ int multiRead(void) {
 		endTime += tvEnd.tv_usec;
 		totalTime = (double)(endTime - startTime);
 		totalTime /= 1000000;  // convert from uS to S.
-		speed = (double)numBytes / (1024*1024*totalTime);
+		*speed = (double)numBytes / (1024*1024*totalTime);
 	#endif
-
-	// Print execution time
-	printf("Time: %0.3fs\nSpeed: %0.3fMiB/s\n", totalTime, speed);
 
 cleanup:
 	usbCloseDevice(deviceHandle, 0);
@@ -246,7 +244,33 @@ cleanup:
 	return retVal;
 }
 
-int main(void) {
-	return multiRead();
+int main(int argc, const char *argv[]) {
+	int retVal;
+	uint32 reqCount;
+	uint32 reqSize;
+	double speed;
+	if ( argc != 3 ) {
+		fprintf(stderr, "Synopsis: example <reqCount> <reqSize>\n");
+		FAIL(1, cleanup);
+	}
+	reqCount = (uint32)strtoul(argv[1], NULL, 10);
+	if ( reqCount < 2 ) {
+		fprintf(stderr, "example: Please ensure reqCount>=2\n");
+		FAIL(2, cleanup);
+	}
+	reqSize = (uint32)strtoul(argv[2], NULL, 10);
+	if ( reqSize < 1024 || reqSize > 65536 ) {
+		fprintf(stderr, "example: Please ensure 1024<=reqSize<=65536\n");
+		FAIL(3, cleanup);
+	}
+
+	retVal = multiRead(reqCount-2, reqSize, &speed);
+	CHECK_STATUS(retVal, retVal, cleanup);
+
+	//printf("reqCount = %d; reqSize = %d; speed = %0.3fMiB/s\n", reqCount, reqSize, speed);
+	printf("%d,%0.3f\n", reqSize, speed);
+
 	//return bufferRead();
+cleanup:
+	return retVal;
 }
