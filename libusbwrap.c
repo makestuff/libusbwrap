@@ -373,7 +373,7 @@ DLLEXPORT(struct libusb_context *) usbGetContext(void) {
 	return m_ctx;
 }
 
-static void bulk_transfer_cb(struct libusb_transfer *transfer) {
+static void WINAPI bulk_transfer_cb(struct libusb_transfer *transfer) {
 	int *completed = transfer->user_data;
 	*completed = 1;
 }
