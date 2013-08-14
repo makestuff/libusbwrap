@@ -28,7 +28,7 @@ cleanup:
 	for ( i = 0; i < capacity; i++ ) {
 		(*destroyFunc)(self->itemArray[i]);
 	}
-	free(self->itemArray);
+	free((void*)self->itemArray);
 	self->itemArray = NULL;
 exit:
 	return retVal;
@@ -40,7 +40,7 @@ void queueDestroy(struct UnboundedQueue *self) {
 		for ( i = 0; i < self->capacity; i++ ) {
 			(*self->destroyFunc)(self->itemArray[i]);
 		}
-		free(self->itemArray);
+		free((void*)self->itemArray);
 	}
 }
 
@@ -58,10 +58,10 @@ int queuePut(struct UnboundedQueue *self, Item *item) {
 		Item item;
 		newArray = (Item *)calloc(newCapacity, sizeof(Item));
 		CHECK_STATUS(newArray == NULL, ENOMEM, cleanup);
-		memcpy(newArray, ptr, firstHalfLength * sizeof(Item));
+		memcpy((void*)newArray, ptr, firstHalfLength * sizeof(Item));
 		if ( secondHalfLength ) {
 			memcpy(
-				newArray + firstHalfLength,
+				(void*)(newArray + firstHalfLength),
 				self->itemArray,
 				secondHalfLength * sizeof(Item)
 			);

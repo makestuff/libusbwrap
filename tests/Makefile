@@ -19,4 +19,5 @@ DEPS    := error
 TYPE    := exe
 SUBDIRS :=
 
+-include ../deps.mk
 -include $(ROOT)/common/top.mk

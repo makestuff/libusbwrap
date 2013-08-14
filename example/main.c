@@ -54,6 +54,8 @@
 	}
 #endif
 
+#define CHUNK_SIZE 4096
+
 int bufferRead(void) {
 	int retVal = 0, uStatus;
 	struct USBDevice *deviceHandle = NULL;
@@ -61,7 +63,6 @@ int bufferRead(void) {
 	uint8 *ptr;
 	const uint8 *buf;
 	struct CompletionReport completionReport;
-	const uint32 chunkSize = 4096;
 
 	// Init library
 	uStatus = usbInitialise(0, &error);
@@ -82,33 +83,33 @@ int bufferRead(void) {
 
 	// Populate the buffer with a couple of FPGA write commands and one FPGA read command
    *ptr++ = 0x00; // write ch0
-	*ptr++ = (uint8)(chunkSize >> 24);
-	*ptr++ = (uint8)(chunkSize >> 16);
-	*ptr++ = (uint8)(chunkSize >> 8);
-	*ptr++ = (uint8)chunkSize;
-	memcpy(ptr, randomData, chunkSize);
-	ptr += chunkSize;
+	*ptr++ = (uint8)(CHUNK_SIZE >> 24);
+	*ptr++ = (uint8)(CHUNK_SIZE >> 16);
+	*ptr++ = (uint8)(CHUNK_SIZE >> 8);
+	*ptr++ = (uint8)(CHUNK_SIZE & 0xFF);
+	memcpy(ptr, randomData, CHUNK_SIZE);
+	ptr += CHUNK_SIZE;
 
    *ptr++ = 0x00; // write ch0
-	*ptr++ = (uint8)(chunkSize >> 24);
-	*ptr++ = (uint8)(chunkSize >> 16);
-	*ptr++ = (uint8)(chunkSize >> 8);
-	*ptr++ = (uint8)chunkSize;
-	memcpy(ptr, randomData+chunkSize, chunkSize);
-	ptr += chunkSize;
+	*ptr++ = (uint8)(CHUNK_SIZE >> 24);
+	*ptr++ = (uint8)(CHUNK_SIZE >> 16);
+	*ptr++ = (uint8)(CHUNK_SIZE >> 8);
+	*ptr++ = (uint8)(CHUNK_SIZE & 0xFF);
+	memcpy(ptr, randomData+CHUNK_SIZE, CHUNK_SIZE);
+	ptr += CHUNK_SIZE;
 
    *ptr++ = 0x80; // read ch0
-	*ptr++ = (uint8)(chunkSize >> 24);
-	*ptr++ = (uint8)(chunkSize >> 16);
-	*ptr++ = (uint8)(chunkSize >> 8);
-	*ptr++ = (uint8)chunkSize;
+	*ptr++ = (uint8)(CHUNK_SIZE >> 24);
+	*ptr++ = (uint8)(CHUNK_SIZE >> 16);
+	*ptr++ = (uint8)(CHUNK_SIZE >> 8);
+	*ptr++ = (uint8)(CHUNK_SIZE & 0xFF);
 	
 	// Submit the write
 	uStatus = bulkWriteAsyncSubmit(deviceHandle, 2, (uint32)(ptr-buf), 1000);
 	CHECK_STATUS(uStatus, 5, cleanup);
 
 	// Submit the read
-	uStatus = bulkReadAsync(deviceHandle, 6, chunkSize, 9000);  // Read response data
+	uStatus = bulkReadAsync(deviceHandle, 6, CHUNK_SIZE, 9000);  // Read response data
 	CHECK_STATUS(uStatus, 5, cleanup);
 
 	// Wait for them to be serviced
@@ -132,13 +133,12 @@ int multiRead(void) {
 	int retVal = 0, uStatus;
 	struct USBDevice *deviceHandle = NULL;
 	const char *error = NULL;
-	const uint32 chunkSize = 4096;
 	const uint8 buf[] = {
 		0x80,
-		(uint8)(chunkSize >> 24),
-		(uint8)(chunkSize >> 16),
-		(uint8)(chunkSize >> 8),
-		(uint8)chunkSize
+		(uint8)(CHUNK_SIZE >> 24),
+		(uint8)(CHUNK_SIZE >> 16),
+		(uint8)(CHUNK_SIZE >> 8),
+		(uint8)(CHUNK_SIZE & 0xFF)
 	};
 	struct CompletionReport completionReport;
 	uint32 i, numBytes;
@@ -175,17 +175,17 @@ int multiRead(void) {
 	// Send a couple of read commands to the FPGA
 	uStatus = bulkWriteAsync(deviceHandle, 2, buf, 5, 9000);  // Write request command
 	CHECK_STATUS(uStatus, 5, cleanup);
-	uStatus = bulkReadAsync(deviceHandle, 6, chunkSize, 9000);  // Read response data
+	uStatus = bulkReadAsync(deviceHandle, 6, CHUNK_SIZE, 9000);  // Read response data
 	CHECK_STATUS(uStatus, 5, cleanup);
 
 	uStatus = bulkWriteAsync(deviceHandle, 2, buf, 5, 9000);  // Write request command
 	CHECK_STATUS(uStatus, 5, cleanup);
-	uStatus = bulkReadAsync(deviceHandle, 6, chunkSize, 9000);  // Read response data
+	uStatus = bulkReadAsync(deviceHandle, 6, CHUNK_SIZE, 9000);  // Read response data
 	CHECK_STATUS(uStatus, 5, cleanup);
 
 	// On each iteration, await completion and send a new read command
 	i = 100;
-	numBytes = (i+2)*chunkSize;
+	numBytes = (i+2)*CHUNK_SIZE;
 	while ( i-- ) {
 		uStatus = bulkAwaitCompletion(deviceHandle, &completionReport);
 		CHECK_STATUS(uStatus, 100, cleanup);
@@ -196,7 +196,7 @@ int multiRead(void) {
 		
 		uStatus = bulkWriteAsync(deviceHandle, 2, buf, 5, 9000);  // Write request command
 		CHECK_STATUS(uStatus, 5, cleanup);
-		uStatus = bulkReadAsync(deviceHandle, 6, chunkSize, 9000);  // Read response data
+		uStatus = bulkReadAsync(deviceHandle, 6, CHUNK_SIZE, 9000);  // Read response data
 		CHECK_STATUS(uStatus, 5, cleanup);
 	}
 
@@ -220,7 +220,7 @@ int multiRead(void) {
 		QueryPerformanceCounter(&tvEnd);
 		totalTime = (double)(tvEnd.QuadPart - tvStart.QuadPart);
 		totalTime /= freq.QuadPart;
-		speed = (double)length / (1024*1024*totalTime);
+		speed = (double)numBytes / (1024*1024*totalTime);
 	#else
 		gettimeofday(&tvEnd, NULL);
 		startTime = tvStart.tv_sec;
