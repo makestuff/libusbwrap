@@ -58,7 +58,8 @@
 #define CHUNK_SIZE 4096
 
 int bufferRead(void) {
-	int retVal = 0, uStatus;
+	int retVal = 0;
+	USBStatus uStatus;
 	struct USBDevice *deviceHandle = NULL;
 	const char *error = NULL;
 	uint8 *ptr;
@@ -78,8 +79,8 @@ int bufferRead(void) {
 	CHECK_STATUS(uStatus, 3, cleanup);
 
 	// Get the next available 64KiB write buffer
-	uStatus = bulkWriteAsyncPrepare(deviceHandle, &ptr);  // Write request command
-	CHECK_STATUS(uStatus, 5, cleanup);
+	uStatus = usbBulkWriteAsyncPrepare(deviceHandle, &ptr, &error);  // Write request command
+	CHECK_STATUS(uStatus, 4, cleanup);
 	buf = ptr;
 
 	// Populate the buffer with a couple of FPGA write commands and one FPGA read command
@@ -106,21 +107,20 @@ int bufferRead(void) {
 	*ptr++ = (uint8)(CHUNK_SIZE & 0xFF);
 	
 	// Submit the write
-	uStatus = bulkWriteAsyncSubmit(deviceHandle, 2, (uint32)(ptr-buf), 1000);
+	uStatus = usbBulkWriteAsyncSubmit(deviceHandle, 2, (uint32)(ptr-buf), 1000, &error);
 	CHECK_STATUS(uStatus, 5, cleanup);
 
 	// Submit the read
-	uStatus = bulkReadAsync(deviceHandle, 6, CHUNK_SIZE, 9000);  // Read response data
-	CHECK_STATUS(uStatus, 5, cleanup);
+	uStatus = usbBulkReadAsync(deviceHandle, 6, CHUNK_SIZE, 9000, &error);  // Read response data
+	CHECK_STATUS(uStatus, 6, cleanup);
 
 	// Wait for them to be serviced
-	uStatus = bulkAwaitCompletion(deviceHandle, &completionReport);
-	CHECK_STATUS(uStatus, 100, cleanup);
+	uStatus = usbBulkAwaitCompletion(deviceHandle, &completionReport, &error);
+	CHECK_STATUS(uStatus, 7, cleanup);
 	printCompletionReport(&completionReport);
-	uStatus = bulkAwaitCompletion(deviceHandle, &completionReport);
-	CHECK_STATUS(uStatus, 101, cleanup);
+	uStatus = usbBulkAwaitCompletion(deviceHandle, &completionReport, &error);
+	CHECK_STATUS(uStatus, 8, cleanup);
 	printCompletionReport(&completionReport);
-
 cleanup:
 	usbCloseDevice(deviceHandle, 0);
 	if ( error ) {
@@ -131,7 +131,8 @@ cleanup:
 }
 
 int multiRead(uint32 reqCount, uint32 reqSize, double *speed) {
-	int retVal = 0, uStatus;
+	int retVal = 0;
+	USBStatus uStatus;
 	struct USBDevice *deviceHandle = NULL;
 	const char *error = NULL;
 	uint8 buf[5];
@@ -175,45 +176,45 @@ int multiRead(uint32 reqCount, uint32 reqSize, double *speed) {
 	#endif
 
 	// Send a couple of read commands to the FPGA
-	uStatus = bulkWriteAsync(deviceHandle, 2, buf, 5, 9000);  // Write request command
-	CHECK_STATUS(uStatus, 5, cleanup);
-	uStatus = bulkReadAsync(deviceHandle, 6, reqSize, 9000);  // Read response data
+	uStatus = usbBulkWriteAsync(deviceHandle, 2, buf, 5, 9000, &error);  // Write request command
+	CHECK_STATUS(uStatus, 4, cleanup);
+	uStatus = usbBulkReadAsync(deviceHandle, 6, reqSize, 9000, &error);  // Read response data
 	CHECK_STATUS(uStatus, 5, cleanup);
 
-	uStatus = bulkWriteAsync(deviceHandle, 2, buf, 5, 9000);  // Write request command
-	CHECK_STATUS(uStatus, 5, cleanup);
-	uStatus = bulkReadAsync(deviceHandle, 6, reqSize, 9000);  // Read response data
-	CHECK_STATUS(uStatus, 5, cleanup);
+	uStatus = usbBulkWriteAsync(deviceHandle, 2, buf, 5, 9000, &error);  // Write request command
+	CHECK_STATUS(uStatus, 6, cleanup);
+	uStatus = usbBulkReadAsync(deviceHandle, 6, reqSize, 9000, &error);  // Read response data
+	CHECK_STATUS(uStatus, 7, cleanup);
 
 	// On each iteration, await completion and send a new read command
 	numBytes = (reqCount+2)*reqSize;
 	while ( reqCount-- ) {
-		uStatus = bulkAwaitCompletion(deviceHandle, &completionReport);
-		CHECK_STATUS(uStatus, 100, cleanup);
+		uStatus = usbBulkAwaitCompletion(deviceHandle, &completionReport, &error);
+		CHECK_STATUS(uStatus, 8, cleanup);
 		printCompletionReport(&completionReport);
-		uStatus = bulkAwaitCompletion(deviceHandle, &completionReport);
-		CHECK_STATUS(uStatus, 101, cleanup);
+		uStatus = usbBulkAwaitCompletion(deviceHandle, &completionReport, &error);
+		CHECK_STATUS(uStatus, 9, cleanup);
 		printCompletionReport(&completionReport);
 		
-		uStatus = bulkWriteAsync(deviceHandle, 2, buf, 5, 9000);  // Write request command
-		CHECK_STATUS(uStatus, 5, cleanup);
-		uStatus = bulkReadAsync(deviceHandle, 6, reqSize, 9000);  // Read response data
-		CHECK_STATUS(uStatus, 5, cleanup);
+		uStatus = usbBulkWriteAsync(deviceHandle, 2, buf, 5, 9000, &error);  // Write request command
+		CHECK_STATUS(uStatus, 10, cleanup);
+		uStatus = usbBulkReadAsync(deviceHandle, 6, reqSize, 9000, &error);  // Read response data
+		CHECK_STATUS(uStatus, 11, cleanup);
 	}
 
 	// Wait for the stragglers...
-	uStatus = bulkAwaitCompletion(deviceHandle, &completionReport);
-	CHECK_STATUS(uStatus, 100, cleanup);
+	uStatus = usbBulkAwaitCompletion(deviceHandle, &completionReport, &error);
+	CHECK_STATUS(uStatus, 12, cleanup);
 	printCompletionReport(&completionReport);
-	uStatus = bulkAwaitCompletion(deviceHandle, &completionReport);
-	CHECK_STATUS(uStatus, 101, cleanup);
+	uStatus = usbBulkAwaitCompletion(deviceHandle, &completionReport, &error);
+	CHECK_STATUS(uStatus, 13, cleanup);
 	printCompletionReport(&completionReport);
 
-	uStatus = bulkAwaitCompletion(deviceHandle, &completionReport);
-	CHECK_STATUS(uStatus, 100, cleanup);
+	uStatus = usbBulkAwaitCompletion(deviceHandle, &completionReport, &error);
+	CHECK_STATUS(uStatus, 14, cleanup);
 	printCompletionReport(&completionReport);
-	uStatus = bulkAwaitCompletion(deviceHandle, &completionReport);
-	CHECK_STATUS(uStatus, 101, cleanup);
+	uStatus = usbBulkAwaitCompletion(deviceHandle, &completionReport, &error);
+	CHECK_STATUS(uStatus, 15, cleanup);
 	printCompletionReport(&completionReport);
 
 	// Record stop time

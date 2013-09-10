@@ -52,9 +52,14 @@ extern "C" {
 		USB_CANNOT_CLAIM_INTERFACE,    ///< Couldn't claim the supplied interface. Does it exist?
 		USB_CANNOT_SET_ALTINT,         ///< Couldn't set the supplied alternate interface.
 		USB_CANNOT_GET_DESCRIPTOR,     ///< Couldn't get the supplied descriptor.
-		USB_CONTROL,                   ///< A USB control message failed
-		USB_BULK,                      ///< A USB bulk read or write failed
-		USB_ALLOC_ERR                  ///< An allocation failed
+		USB_CONTROL,                   ///< A USB control message failed.
+		USB_BULK,                      ///< A USB bulk read or write failed.
+		USB_ALLOC_ERR,                 ///< An allocation failed.
+		USB_EMPTY_QUEUE,               ///< An attempt to take an item from an empty work queue.
+		USB_ASYNC_SUBMIT,              ///< Async submission error.
+		USB_ASYNC_EVENT,               ///< Async event error.
+		USB_ASYNC_TRANSFER,            ///< Async transfer error.
+		USB_ASYNC_SIZE                 ///< Async API transfers must be 64KiB or smaller.
 	} USBStatus;
 	//@}
 	
@@ -282,35 +287,34 @@ extern "C" {
 		uint32 timeout, const char **error
 	) WARN_UNUSED_RESULT;
 
-	struct libusb_context;
-
-	/**
-	 * @brief Get this application's context.
-	 * 
-	 * @returns This application's context.
-	 */
-	DLLEXPORT(struct libusb_context *) usbGetContext(void);
-
 	// Caller supplies the buffer
-	DLLEXPORT(int) bulkWriteAsync(
-		struct USBDevice *dev, uint8 endpoint, const uint8 *buffer, uint32 length, uint32 timeout
+	DLLEXPORT(USBStatus) usbBulkWriteAsync(
+		struct USBDevice *dev, uint8 endpoint, const uint8 *buffer, uint32 length, uint32 timeout,
+		const char **error
 	) WARN_UNUSED_RESULT;
 
-	// Library gives the caller a buffer to use
-	DLLEXPORT(int) bulkWriteAsyncPrepare(
-		struct USBDevice *dev, uint8 **buffer
-	) WARN_UNUSED_RESULT;
-	DLLEXPORT(int) bulkWriteAsyncSubmit(
-		struct USBDevice *dev, uint8 endpoint, uint32 length, uint32 timeout
+	// Library gives the caller a buffer to populate...
+	DLLEXPORT(USBStatus) usbBulkWriteAsyncPrepare(
+		struct USBDevice *dev, uint8 **buffer,
+		const char **error
 	) WARN_UNUSED_RESULT;
 
-	DLLEXPORT(int) bulkReadAsync(
-		struct USBDevice *dev, uint8 endpoint, uint32 length, uint32 timeout
+	// ...and then submit later.
+	DLLEXPORT(USBStatus) usbBulkWriteAsyncSubmit(
+		struct USBDevice *dev, uint8 endpoint, uint32 length, uint32 timeout, const char **error
 	) WARN_UNUSED_RESULT;
 
-	DLLEXPORT(int) bulkAwaitCompletion(
-		struct USBDevice *dev, struct CompletionReport *report
+	DLLEXPORT(USBStatus) usbBulkReadAsync(
+		struct USBDevice *dev, uint8 endpoint, uint32 length, uint32 timeout, const char **error
 	) WARN_UNUSED_RESULT;
+
+	DLLEXPORT(USBStatus) usbBulkAwaitCompletion(
+		struct USBDevice *dev, struct CompletionReport *report, const char **error
+	) WARN_UNUSED_RESULT;
+
+	DLLEXPORT(size_t) usbNumOutstandingRequests(
+		struct USBDevice *dev
+	);
 
 	//@}
 

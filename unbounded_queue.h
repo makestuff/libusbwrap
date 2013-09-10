@@ -1,6 +1,8 @@
 #ifndef UNBOUNDED_QUEUE_H
 #define UNBOUNDED_QUEUE_H
 
+#include "libusbwrap.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -19,16 +21,16 @@ extern "C" {
 		DestroyFunc destroyFunc;
 	};
 
-	int queueInit(
+	USBStatus queueInit(
 		struct UnboundedQueue *self, size_t capacity, CreateFunc createFunc, DestroyFunc destroyFunc
 	);
-	int queuePut(
+	USBStatus queuePut(
 		struct UnboundedQueue *self, Item *item  // never blocks, can ENOMEM
 	);
 	void queueCommitPut(
 		struct UnboundedQueue *self
 	);
-	int queueTake(
+	USBStatus queueTake(
 		struct UnboundedQueue *self, Item *item  // returns NULL on empty
 	);
 	void queueCommitTake(
@@ -37,6 +39,9 @@ extern "C" {
 	void queueDestroy(
 		struct UnboundedQueue *self
 	);
+	static inline size_t queueSize(const struct UnboundedQueue *self) {
+		return self->numItems;
+	}
 
 #ifdef __cplusplus
 }

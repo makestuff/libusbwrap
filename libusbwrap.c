@@ -199,7 +199,7 @@ exit:
 	return NULL;
 }
 
-void destroyTransfer(struct TransferWrapper *tx) {
+static void destroyTransfer(struct TransferWrapper *tx) {
 	if ( tx ) {
 		libusb_free_transfer(tx->transfer);
 		free((void*)tx);
@@ -288,7 +288,7 @@ DLLEXPORT(USBStatus) usbControlRead(
 		"usbControlRead(): %s", libusb_error_name(status));
 	CHECK_STATUS(
 		status != wLength, USB_CONTROL, cleanup,
-		"usbControlRead(): expected to read %d bytes but actually read %d", wLength, status);
+		"usbControlRead(): Expected to read %d bytes but actually read %d", wLength, status);
 cleanup:
 	return retVal;
 }
@@ -314,7 +314,7 @@ DLLEXPORT(USBStatus) usbControlWrite(
 		"usbControlWrite(): %s", libusb_error_name(status));
 	CHECK_STATUS(
 		status != wLength, USB_CONTROL, cleanup,
-		"usbControlWrite(): expected to write %d bytes but actually wrote %d", wLength, status);
+		"usbControlWrite(): Expected to write %d bytes but actually wrote %d", wLength, status);
 cleanup:
 	return retVal;
 }
@@ -338,7 +338,7 @@ DLLEXPORT(USBStatus) usbBulkRead(
 		"usbBulkRead(): %s", libusb_error_name(status));
 	CHECK_STATUS(
 		(uint32)numRead != count, USB_BULK, cleanup,
-		"usbBulkRead(): expected to read %d bytes but actually read %d (status = %d): %s",
+		"usbBulkRead(): Expected to read %d bytes but actually read %d (status = %d): %s",
 		count, numRead, status, libusb_error_name(status));
 cleanup:
 	return retVal;
@@ -363,14 +363,10 @@ DLLEXPORT(USBStatus) usbBulkWrite(
 		"usbBulkWrite(): %s", libusb_error_name(status));
 	CHECK_STATUS(
 		(uint32)numWritten != count, USB_BULK, cleanup,
-		"usbBulkWrite(): expected to write %d bytes but actually wrote %d (status = %d): %s",
+		"usbBulkWrite(): Expected to write %d bytes but actually wrote %d (status = %d): %s",
 		count, numWritten, status, libusb_error_name(status));
 cleanup:
 	return retVal;
-}
-
-DLLEXPORT(struct libusb_context *) usbGetContext(void) {
-	return m_ctx;
 }
 
 static void WINAPI bulk_transfer_cb(struct libusb_transfer *transfer) {
@@ -378,15 +374,17 @@ static void WINAPI bulk_transfer_cb(struct libusb_transfer *transfer) {
 	*completed = 1;
 }
 
-DLLEXPORT(int) bulkWriteAsync(
-	struct USBDevice *dev, uint8 endpoint, const uint8 *buffer, uint32 length, uint32 timeout)
+DLLEXPORT(USBStatus) usbBulkWriteAsync(
+	struct USBDevice *dev, uint8 endpoint, const uint8 *buffer, uint32 length, uint32 timeout,
+	const char **error)
 {
-	int retVal = 0;
+	int retVal = USB_SUCCESS;
 	struct TransferWrapper *wrapper;
 	struct libusb_transfer *transfer;
 	int *completed;
-	int status = queuePut(&dev->queue, (Item*)&wrapper);
-	CHECK_STATUS(status, status, cleanup);
+	int iStatus;
+	USBStatus uStatus = queuePut(&dev->queue, (Item*)&wrapper);
+	CHECK_STATUS(uStatus, uStatus, cleanup);
 	transfer = wrapper->transfer;
 	completed = &wrapper->completed;
 	*completed = 0;
@@ -396,34 +394,42 @@ DLLEXPORT(int) bulkWriteAsync(
 		bulk_transfer_cb, completed, timeout
 	);
 	transfer->type = LIBUSB_TRANSFER_TYPE_BULK;
-	status = libusb_submit_transfer(transfer);
-	CHECK_STATUS(status, status, cleanup);
+	iStatus = libusb_submit_transfer(transfer);
+	CHECK_STATUS(
+		iStatus, USB_ASYNC_SUBMIT, cleanup,
+		"usbBulkWriteAsync(): Submission error: %s", libusb_error_name(iStatus)
+	);
 	queueCommitPut(&dev->queue);
 cleanup:
 	return retVal;
 }
 
-DLLEXPORT(int) bulkWriteAsyncPrepare(struct USBDevice *dev, uint8 **buffer) {
-	int retVal = 0;
+DLLEXPORT(USBStatus) usbBulkWriteAsyncPrepare(
+	struct USBDevice *dev, uint8 **buffer, const char **error)
+{
+	USBStatus retVal = USB_SUCCESS;
 	struct TransferWrapper *wrapper;
-	int status = queuePut(&dev->queue, (Item*)&wrapper);
-	CHECK_STATUS(status, status, cleanup);
+	USBStatus status = queuePut(&dev->queue, (Item*)&wrapper);
+	CHECK_STATUS(status, status, cleanup, "usbBulkWriteAsyncPrepare(): Work queue insertion error");
 	*buffer = wrapper->buffer;
 cleanup:
 	return retVal;
 }
 
-DLLEXPORT(int) bulkWriteAsyncSubmit(
-	struct USBDevice *dev, uint8 endpoint, uint32 length, uint32 timeout)
+DLLEXPORT(USBStatus) usbBulkWriteAsyncSubmit(
+	struct USBDevice *dev, uint8 endpoint, uint32 length, uint32 timeout, const char **error)
 {
-	int retVal = 0;
+	USBStatus retVal = USB_SUCCESS;
 	struct TransferWrapper *wrapper;
 	struct libusb_transfer *transfer;
 	int *completed;
-	int status;
-	CHECK_STATUS(length > 0x10000, -1, cleanup);
-	status = queuePut(&dev->queue, (Item*)&wrapper);
-	CHECK_STATUS(status, status, cleanup);
+	USBStatus uStatus;
+	int iStatus;
+	CHECK_STATUS(
+		length > 0x10000, USB_ASYNC_SIZE, cleanup,
+		"usbBulkWriteAsyncSubmit(): Transfer length exceeds 0x10000");
+	uStatus = queuePut(&dev->queue, (Item*)&wrapper);
+	CHECK_STATUS(uStatus, uStatus, cleanup, "usbBulkWriteAsyncSubmit(): Work queue insertion error");
 	transfer = wrapper->transfer;
 	completed = &wrapper->completed;
 	*completed = 0;
@@ -433,25 +439,30 @@ DLLEXPORT(int) bulkWriteAsyncSubmit(
 		bulk_transfer_cb, completed, timeout
 	);
 	transfer->type = LIBUSB_TRANSFER_TYPE_BULK;
-	status = libusb_submit_transfer(transfer);
-	CHECK_STATUS(status, status, cleanup);
+	iStatus = libusb_submit_transfer(transfer);
+	CHECK_STATUS(
+		iStatus, USB_ASYNC_SUBMIT, cleanup,
+		"usbBulkWriteAsyncSubmit(): Submission error: %s", libusb_error_name(iStatus));
 	queueCommitPut(&dev->queue);
 cleanup:
 	return retVal;
 }
 
-DLLEXPORT(int) bulkReadAsync(
-	struct USBDevice *dev, uint8 endpoint, uint32 length, uint32 timeout)
+DLLEXPORT(USBStatus) usbBulkReadAsync(
+	struct USBDevice *dev, uint8 endpoint, uint32 length, uint32 timeout, const char **error)
 {
-	int retVal = 0;
+	USBStatus retVal = USB_SUCCESS;
 	struct TransferWrapper *wrapper;
 	struct libusb_transfer *transfer;
 	uint8 *buffer;
 	int *completed;
-	int status;
-	CHECK_STATUS(length > 0x10000, -1, cleanup);
-	status = queuePut(&dev->queue, (Item*)&wrapper);
-	CHECK_STATUS(status, status, cleanup);
+	USBStatus uStatus;
+	int iStatus;
+	CHECK_STATUS(
+		length > 0x10000, USB_ASYNC_SIZE, cleanup,
+		"usbBulkReadAsync(): Transfer length exceeds 0x10000");
+	uStatus = queuePut(&dev->queue, (Item*)&wrapper);
+	CHECK_STATUS(uStatus, uStatus, cleanup, "usbBulkReadAsync(): Work queue insertion error");
 	transfer = wrapper->transfer;
 	completed = &wrapper->completed;
 	*completed = 0;
@@ -462,36 +473,44 @@ DLLEXPORT(int) bulkReadAsync(
 		bulk_transfer_cb, completed, timeout
 	);
 	transfer->type = LIBUSB_TRANSFER_TYPE_BULK;
-	status = libusb_submit_transfer(transfer);
-	CHECK_STATUS(status, status, cleanup);
+	iStatus = libusb_submit_transfer(transfer);
+	CHECK_STATUS(
+		iStatus, USB_ASYNC_SUBMIT, cleanup,
+		"usbBulkReadAsync(): Submission error: %s", libusb_error_name(iStatus));
 	queueCommitPut(&dev->queue);
 cleanup:
 	return retVal;
 }
 
-DLLEXPORT(int) bulkAwaitCompletion(struct USBDevice *dev, struct CompletionReport *report) {
-	int retVal = 0;
+DLLEXPORT(USBStatus) usbBulkAwaitCompletion(
+	struct USBDevice *dev, struct CompletionReport *report, const char **error)
+{
+	USBStatus retVal = USB_SUCCESS;
 	struct TransferWrapper *wrapper;
 	struct libusb_transfer *transfer;
 	int *completed;
-	int status = queueTake(&dev->queue, (Item*)&wrapper);
-	CHECK_STATUS(status, status, exit);
+	int iStatus;
+	struct timeval timeout = {LONG_MAX, LONG_MAX};
+	USBStatus uStatus = queueTake(&dev->queue, (Item*)&wrapper);
+	CHECK_STATUS(uStatus, uStatus, exit, "usbBulkAwaitCompletion(): Work queue fetch error");
 	transfer = wrapper->transfer;
 	completed = &wrapper->completed;
 	while ( *completed == 0 ) {
-		status = libusb_handle_events_completed(m_ctx, completed);
-		if ( status < 0 ) {
-			if ( status == LIBUSB_ERROR_INTERRUPTED ) {
+		iStatus = libusb_handle_events_timeout_completed(m_ctx, &timeout, completed);
+		if ( iStatus < 0 ) {
+			if ( iStatus == LIBUSB_ERROR_INTERRUPTED ) {
 				continue;
 			}
 			if ( libusb_cancel_transfer(transfer) == LIBUSB_SUCCESS ) {
 				while ( *completed == 0 ) {
-					if ( libusb_handle_events_completed(m_ctx, completed) < 0 ) {
+					if ( libusb_handle_events_timeout_completed(m_ctx, &timeout, completed) < 0 ) {
 						break;
 					}
 				}
 			}
-			FAIL(status, commit);
+			CHECK_STATUS(
+				true, USB_ASYNC_EVENT, commit,
+				"usbBulkAwaitCompletion(): Event error: %s", libusb_error_name(iStatus));
 		}
 	}
 
@@ -502,29 +521,36 @@ DLLEXPORT(int) bulkAwaitCompletion(struct USBDevice *dev, struct CompletionRepor
 
 	switch ( transfer->status ) {
 	case LIBUSB_TRANSFER_COMPLETED:
-		retVal = 0;
+		iStatus = 0;
 		break;
 	case LIBUSB_TRANSFER_TIMED_OUT:
-		retVal = LIBUSB_ERROR_TIMEOUT;
+		iStatus = LIBUSB_ERROR_TIMEOUT;
 		break;
 	case LIBUSB_TRANSFER_STALL:
-		retVal = LIBUSB_ERROR_PIPE;
+		iStatus = LIBUSB_ERROR_PIPE;
 		break;
 	case LIBUSB_TRANSFER_OVERFLOW:
-		retVal = LIBUSB_ERROR_OVERFLOW;
+		iStatus = LIBUSB_ERROR_OVERFLOW;
 		break;
 	case LIBUSB_TRANSFER_NO_DEVICE:
-		retVal = LIBUSB_ERROR_NO_DEVICE;
+		iStatus = LIBUSB_ERROR_NO_DEVICE;
 		break;
 	case LIBUSB_TRANSFER_ERROR:
 	case LIBUSB_TRANSFER_CANCELLED:
-		retVal = LIBUSB_ERROR_IO;
+		iStatus = LIBUSB_ERROR_IO;
 		break;
 	default:
-		retVal = LIBUSB_ERROR_OTHER;
+		iStatus = LIBUSB_ERROR_OTHER;
 	}
+	CHECK_STATUS(
+		iStatus, USB_ASYNC_TRANSFER, commit,
+		"usbBulkAwaitCompletion(): Transfer error: %s", libusb_error_name(iStatus));
 commit:
 	queueCommitTake(&dev->queue);
 exit:
 	return retVal;
+}
+
+DLLEXPORT(size_t) usbNumOutstandingRequests(struct USBDevice *dev) {
+	return queueSize(&dev->queue);
 }

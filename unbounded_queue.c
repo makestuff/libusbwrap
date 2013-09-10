@@ -1,17 +1,17 @@
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include "unbounded_queue.h"
 #include <makestuff.h>
+#include "libusbwrap.h"
 
-int queueInit(
+USBStatus queueInit(
 	struct UnboundedQueue *self, size_t capacity, CreateFunc createFunc, DestroyFunc destroyFunc)
 {
-	int retVal;
+	USBStatus retVal;
 	size_t i;
 	Item item;
 	self->itemArray = (Item *)calloc(capacity, sizeof(Item));
-	CHECK_STATUS(self->itemArray == NULL, ENOMEM, exit);
+	CHECK_STATUS(self->itemArray == NULL, USB_ALLOC_ERR, exit);
 	self->capacity = capacity;
 	self->putIndex = 0;
 	self->takeIndex = 0;
@@ -20,10 +20,10 @@ int queueInit(
 	self->destroyFunc = destroyFunc;
 	for ( i = 0; i < capacity; i++ ) {
 		item = (*createFunc)();
-		CHECK_STATUS(item == NULL, ENOMEM, cleanup);
+		CHECK_STATUS(item == NULL, USB_ALLOC_ERR, cleanup);
 		self->itemArray[i] = item;
 	}
-	return 0;
+	return USB_SUCCESS;
 cleanup:
 	for ( i = 0; i < capacity; i++ ) {
 		(*destroyFunc)(self->itemArray[i]);
@@ -46,8 +46,8 @@ void queueDestroy(struct UnboundedQueue *self) {
 
 // Everything is preserved if a reallocation fails
 //
-int queuePut(struct UnboundedQueue *self, Item *item) {
-	int retVal = 0;
+USBStatus queuePut(struct UnboundedQueue *self, Item *item) {
+	USBStatus retVal = USB_SUCCESS;
 	if ( self->numItems == self->capacity ) {
 		size_t i;
 		Item *newArray;
@@ -57,7 +57,7 @@ int queuePut(struct UnboundedQueue *self, Item *item) {
 		const size_t newCapacity = 2 * self->capacity;
 		Item item;
 		newArray = (Item *)calloc(newCapacity, sizeof(Item));
-		CHECK_STATUS(newArray == NULL, ENOMEM, cleanup);
+		CHECK_STATUS(newArray == NULL, USB_ALLOC_ERR, cleanup);
 		memcpy((void*)newArray, ptr, firstHalfLength * sizeof(Item));
 		if ( secondHalfLength ) {
 			memcpy(
@@ -68,7 +68,7 @@ int queuePut(struct UnboundedQueue *self, Item *item) {
 		}
 		for ( i = self->capacity; i < newCapacity; i++ ) {
 			item = (*self->createFunc)();
-			CHECK_STATUS(item == NULL, ENOMEM, cleanup);
+			CHECK_STATUS(item == NULL, USB_ALLOC_ERR, cleanup);
 			newArray[i] = item;
 		}
 		self->itemArray = newArray;
@@ -89,9 +89,9 @@ void queueCommitPut(struct UnboundedQueue *self) {
 	}
 }
 
-int queueTake(struct UnboundedQueue *self, Item *item) {
-	int retVal = 0;
-	CHECK_STATUS(self->numItems == 0, 1, cleanup);
+USBStatus queueTake(struct UnboundedQueue *self, Item *item) {
+	USBStatus retVal = 0;
+	CHECK_STATUS(self->numItems == 0, USB_EMPTY_QUEUE, cleanup);
 	*item = self->itemArray[self->takeIndex];
 cleanup:
 	return retVal;

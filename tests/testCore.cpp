@@ -55,8 +55,8 @@ TEST(Queue_testInit) {
 	m_count = 1;
 
 	// Create queue
-	int status = queueInit(&queue, 4, (CreateFunc)createInt, (DestroyFunc)destroyInt);
-	CHECK_EQUAL(0, status);
+	USBStatus status = queueInit(&queue, 4, (CreateFunc)createInt, (DestroyFunc)destroyInt);
+	CHECK_EQUAL(USB_SUCCESS, status);
 
 	// Verify
 	CHECK_EQUAL(4UL, queue.capacity);
@@ -80,22 +80,22 @@ TEST(Queue_testPutNoWrap) {
 	m_count = 1;
 
 	// Create queue
-	int status = queueInit(&queue, 4, (CreateFunc)createInt, (DestroyFunc)destroyInt);
-	CHECK_EQUAL(0, status);
+	USBStatus status = queueInit(&queue, 4, (CreateFunc)createInt, (DestroyFunc)destroyInt);
+	CHECK_EQUAL(USB_SUCCESS, status);
 
 	// Put three items into the queue
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(1UL, *item);
 	*item = 5;
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(2UL, *item);
 	*item = 6;
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(3UL, *item);
 	*item = 7;
 	queueCommitPut(&queue);
@@ -122,27 +122,27 @@ TEST(Queue_testPutWrap) {
 	m_count = 1;
 
 	// Create queue
-	int status = queueInit(&queue, 4, (CreateFunc)createInt, (DestroyFunc)destroyInt);
-	CHECK_EQUAL(0, status);
+	USBStatus status = queueInit(&queue, 4, (CreateFunc)createInt, (DestroyFunc)destroyInt);
+	CHECK_EQUAL(USB_SUCCESS, status);
 
 	// Put four items into the queue
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(1UL, *item);
 	*item = 5;
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(2UL, *item);
 	*item = 6;
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(3UL, *item);
 	*item = 7;
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(4UL, *item);
 	*item = 8;
 	queueCommitPut(&queue);
@@ -169,46 +169,46 @@ TEST(Queue_testPutTake) {
 	m_count = 1;
 
 	// Create queue
-	int status = queueInit(&queue, 4, (CreateFunc)createInt, (DestroyFunc)destroyInt);
-	CHECK_EQUAL(0, status);
+	USBStatus status = queueInit(&queue, 4, (CreateFunc)createInt, (DestroyFunc)destroyInt);
+	CHECK_EQUAL(USB_SUCCESS, status);
 
 	// Put four items into the queue
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(1UL, *item);
 	*item = 5;
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(2UL, *item);
 	*item = 6;
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(3UL, *item);
 	*item = 7;
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(4UL, *item);
 	*item = 8;
 	queueCommitPut(&queue);
 
 	// Take four items out of the queue
 	status = queueTake(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(5UL, *item);
 	queueCommitTake(&queue);
 	status = queueTake(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(6UL, *item);
 	queueCommitTake(&queue);
 	status = queueTake(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(7UL, *item);
 	queueCommitTake(&queue);
 	status = queueTake(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(8UL, *item);
 	queueCommitTake(&queue);
 
@@ -234,8 +234,8 @@ void testRealloc(const size_t offset) {
 	m_count = 1;
 
 	// Create queue
-	int status = queueInit(&queue, 4, (CreateFunc)createInt, (DestroyFunc)destroyInt);
-	CHECK_EQUAL(0, status);
+	USBStatus status = queueInit(&queue, 4, (CreateFunc)createInt, (DestroyFunc)destroyInt);
+	CHECK_EQUAL(USB_SUCCESS, status);
 
 	// Shift indices so realloc has to do more work
 	queue.putIndex = offset;
@@ -243,22 +243,22 @@ void testRealloc(const size_t offset) {
 
 	// Now fill the queue to capacity
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL((offset) % 4 + 1UL, *item);
 	*item = 100;
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL((offset + 1UL) % 4 + 1UL, *item);
 	*item = 101;
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL((offset + 2UL) % 4 + 1UL, *item);
 	*item = 102;
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL((offset + 3UL) % 4 + 1UL, *item);
 	*item = 103;
 	queueCommitPut(&queue);
@@ -271,7 +271,7 @@ void testRealloc(const size_t offset) {
 
 	// Force reallocation
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(5UL, *item);
 	*item = 104;
 	queueCommitPut(&queue);
@@ -294,29 +294,29 @@ void testRealloc(const size_t offset) {
 
 	// Take five items out of the queue
 	status = queueTake(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(100UL, *item);
 	queueCommitTake(&queue);
 	status = queueTake(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(101UL, *item);
 	queueCommitTake(&queue);
 	status = queueTake(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(102UL, *item);
 	queueCommitTake(&queue);
 	status = queueTake(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(103UL, *item);
 	queueCommitTake(&queue);
 	status = queueTake(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	CHECK_EQUAL(104UL, *item);
 	queueCommitTake(&queue);
 
 	// Try to take one more
 	status = queueTake(&queue, (Item*)&item);
-	CHECK_EQUAL(1, status);
+	CHECK_EQUAL(USB_EMPTY_QUEUE, status);
 
 	queueDestroy(&queue);
 }
@@ -333,8 +333,8 @@ TEST(Queue_testAllocOOM) {
 	m_count = 1;
 
 	// Create queue
-	int status = queueInit(&queue, 9, (CreateFunc)createInt, (DestroyFunc)destroyInt);
-	CHECK_EQUAL(ENOMEM, status);
+	USBStatus status = queueInit(&queue, 9, (CreateFunc)createInt, (DestroyFunc)destroyInt);
+	CHECK_EQUAL(USB_ALLOC_ERR, status);
 
 	queueDestroy(&queue);
 }
@@ -345,38 +345,38 @@ TEST(Queue_testReallocOOM) {
 	m_count = 1;
 
 	// Create queue
-	int status = queueInit(&queue, 8, (CreateFunc)createInt, (DestroyFunc)destroyInt);
-	CHECK_EQUAL(0, status);
+	USBStatus status = queueInit(&queue, 8, (CreateFunc)createInt, (DestroyFunc)destroyInt);
+	CHECK_EQUAL(USB_SUCCESS, status);
 
 	// Put eight items into the queue
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	queueCommitPut(&queue);
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(0, status);
+	CHECK_EQUAL(USB_SUCCESS, status);
 	queueCommitPut(&queue);
 
 	// The ninth allocation fails
 	status = queuePut(&queue, (Item*)&item);
-	CHECK_EQUAL(ENOMEM, status);
+	CHECK_EQUAL(USB_ALLOC_ERR, status);
 
 	queueDestroy(&queue);
 }
