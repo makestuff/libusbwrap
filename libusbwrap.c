@@ -284,6 +284,9 @@ DLLEXPORT(USBStatus) usbControlRead(
 		timeout
 	);
 	CHECK_STATUS(
+		status == LIBUSB_ERROR_TIMEOUT, USB_TIMEOUT, cleanup,
+		"usbControlRead(): Timeout!");
+	CHECK_STATUS(
 		status < 0, USB_CONTROL, cleanup,
 		"usbControlRead(): %s", libusb_error_name(status));
 	CHECK_STATUS(
@@ -310,6 +313,9 @@ DLLEXPORT(USBStatus) usbControlWrite(
 		timeout
 	);
 	CHECK_STATUS(
+		status == LIBUSB_ERROR_TIMEOUT, USB_TIMEOUT, cleanup,
+		"usbControlWrite(): Timeout");
+	CHECK_STATUS(
 		status < 0, USB_CONTROL, cleanup,
 		"usbControlWrite(): %s", libusb_error_name(status));
 	CHECK_STATUS(
@@ -333,6 +339,9 @@ DLLEXPORT(USBStatus) usbBulkRead(
 		&numRead,
 		timeout
 	);
+	CHECK_STATUS(
+		status == LIBUSB_ERROR_TIMEOUT, USB_TIMEOUT, cleanup,
+		"usbBulkRead(): Timeout");
 	CHECK_STATUS(
 		status < 0, USB_BULK, cleanup,
 		"usbBulkRead(): %s", libusb_error_name(status));
@@ -358,6 +367,9 @@ DLLEXPORT(USBStatus) usbBulkWrite(
 		&numWritten,
 		timeout
 	);
+	CHECK_STATUS(
+		status == LIBUSB_ERROR_TIMEOUT, USB_TIMEOUT, cleanup,
+		"usbBulkWrite(): Timeout");
 	CHECK_STATUS(
 		status < 0, USB_BULK, cleanup,
 		"usbBulkWrite(): %s", libusb_error_name(status));
@@ -542,6 +554,9 @@ DLLEXPORT(USBStatus) usbBulkAwaitCompletion(
 	default:
 		iStatus = LIBUSB_ERROR_OTHER;
 	}
+	CHECK_STATUS(
+		iStatus == LIBUSB_ERROR_TIMEOUT, USB_TIMEOUT, commit,
+		"usbBulkAwaitCompletion(): Timeout");
 	CHECK_STATUS(
 		iStatus, USB_ASYNC_TRANSFER, commit,
 		"usbBulkAwaitCompletion(): Transfer error: %s", libusb_error_name(iStatus));

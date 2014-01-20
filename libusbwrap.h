@@ -59,7 +59,8 @@ extern "C" {
 		USB_ASYNC_SUBMIT,              ///< Async submission error.
 		USB_ASYNC_EVENT,               ///< Async event error.
 		USB_ASYNC_TRANSFER,            ///< Async transfer error.
-		USB_ASYNC_SIZE                 ///< Async API transfers must be 64KiB or smaller.
+		USB_ASYNC_SIZE,                ///< Async API transfers must be 64KiB or smaller.
+		USB_TIMEOUT                    ///< An operation timed out.
 	} USBStatus;
 	//@}
 	
