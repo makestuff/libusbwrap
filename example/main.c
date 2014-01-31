@@ -111,7 +111,7 @@ int bufferRead(void) {
 	CHECK_STATUS(uStatus, 5, cleanup);
 
 	// Submit the read
-	uStatus = usbBulkReadAsync(deviceHandle, 6, CHUNK_SIZE, 9000, &error);  // Read response data
+	uStatus = usbBulkReadAsync(deviceHandle, 6, NULL, CHUNK_SIZE, 9000, &error);  // Read response data
 	CHECK_STATUS(uStatus, 6, cleanup);
 
 	// Wait for them to be serviced
@@ -178,12 +178,12 @@ int multiRead(uint32 reqCount, uint32 reqSize, double *speed) {
 	// Send a couple of read commands to the FPGA
 	uStatus = usbBulkWriteAsync(deviceHandle, 2, buf, 5, 9000, &error);  // Write request command
 	CHECK_STATUS(uStatus, 4, cleanup);
-	uStatus = usbBulkReadAsync(deviceHandle, 6, reqSize, 9000, &error);  // Read response data
+	uStatus = usbBulkReadAsync(deviceHandle, 6, NULL, reqSize, 9000, &error);  // Read response data
 	CHECK_STATUS(uStatus, 5, cleanup);
 
 	uStatus = usbBulkWriteAsync(deviceHandle, 2, buf, 5, 9000, &error);  // Write request command
 	CHECK_STATUS(uStatus, 6, cleanup);
-	uStatus = usbBulkReadAsync(deviceHandle, 6, reqSize, 9000, &error);  // Read response data
+	uStatus = usbBulkReadAsync(deviceHandle, 6, NULL, reqSize, 9000, &error);  // Read response data
 	CHECK_STATUS(uStatus, 7, cleanup);
 
 	// On each iteration, await completion and send a new read command
@@ -198,7 +198,7 @@ int multiRead(uint32 reqCount, uint32 reqSize, double *speed) {
 		
 		uStatus = usbBulkWriteAsync(deviceHandle, 2, buf, 5, 9000, &error);  // Write request command
 		CHECK_STATUS(uStatus, 10, cleanup);
-		uStatus = usbBulkReadAsync(deviceHandle, 6, reqSize, 9000, &error);  // Read response data
+		uStatus = usbBulkReadAsync(deviceHandle, 6, NULL, reqSize, 9000, &error);  // Read response data
 		CHECK_STATUS(uStatus, 11, cleanup);
 	}
 

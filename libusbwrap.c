@@ -185,7 +185,8 @@ struct TransferWrapper {
 	struct libusb_transfer *transfer;
 	int completed;
 	struct AsyncTransferFlags flags;
-	uint8 buffer[0x10000];
+	uint8 buffer[0x10000];  // can use this...
+	uint8 *bufPtr;          // ...or this.
 };
 struct TransferWrapper *createTransfer(void) {
 	struct TransferWrapper *retVal = (struct TransferWrapper *)calloc(1, sizeof(struct TransferWrapper));
@@ -461,12 +462,11 @@ cleanup:
 }
 
 DLLEXPORT(USBStatus) usbBulkReadAsync(
-	struct USBDevice *dev, uint8 endpoint, uint32 length, uint32 timeout, const char **error)
+	struct USBDevice *dev, uint8 endpoint, uint8 *buffer, uint32 length, uint32 timeout, const char **error)
 {
 	USBStatus retVal = USB_SUCCESS;
 	struct TransferWrapper *wrapper;
 	struct libusb_transfer *transfer;
-	uint8 *buffer;
 	int *completed;
 	USBStatus uStatus;
 	int iStatus;
@@ -479,7 +479,11 @@ DLLEXPORT(USBStatus) usbBulkReadAsync(
 	completed = &wrapper->completed;
 	*completed = 0;
 	wrapper->flags.isRead = 1;
-	buffer = wrapper->buffer;
+	if ( buffer ) {
+		wrapper->bufPtr = buffer;
+	} else {
+		buffer = wrapper->buffer;
+	}
 	libusb_fill_bulk_transfer(
 		transfer, dev->handle, LIBUSB_ENDPOINT_IN | endpoint, buffer, (int)length,
 		bulk_transfer_cb, completed, timeout
@@ -507,6 +511,7 @@ DLLEXPORT(USBStatus) usbBulkAwaitCompletion(
 	CHECK_STATUS(uStatus, uStatus, exit, "usbBulkAwaitCompletion(): Work queue fetch error");
 	transfer = wrapper->transfer;
 	completed = &wrapper->completed;
+	wrapper->bufPtr = NULL;
 	while ( *completed == 0 ) {
 		iStatus = libusb_handle_events_timeout_completed(m_ctx, &timeout, completed);
 		if ( iStatus < 0 ) {

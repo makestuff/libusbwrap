@@ -306,7 +306,7 @@ extern "C" {
 	) WARN_UNUSED_RESULT;
 
 	DLLEXPORT(USBStatus) usbBulkReadAsync(
-		struct USBDevice *dev, uint8 endpoint, uint32 length, uint32 timeout, const char **error
+		struct USBDevice *dev, uint8 endpoint, uint8 *buffer, uint32 length, uint32 timeout, const char **error
 	) WARN_UNUSED_RESULT;
 
 	DLLEXPORT(USBStatus) usbBulkAwaitCompletion(
