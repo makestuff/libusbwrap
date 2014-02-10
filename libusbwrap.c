@@ -34,7 +34,7 @@ static struct libusb_context *m_ctx = NULL;
 static libusb_device_handle *libusbOpenWithVidPid(
 	libusb_context *ctx, uint16 vid, uint16 pid, uint16 did, const char **error)
 {
-	static libusb_device_handle *retVal = NULL;
+	libusb_device_handle *retVal = NULL;
 	struct libusb_device **devs;
 	struct libusb_device *found = NULL;
 	struct libusb_device *dev;
