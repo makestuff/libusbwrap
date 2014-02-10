@@ -506,7 +506,7 @@ DLLEXPORT(USBStatus) usbBulkAwaitCompletion(
 	struct libusb_transfer *transfer;
 	int *completed;
 	int iStatus;
-	struct timeval timeout = {LONG_MAX, LONG_MAX};
+	struct timeval timeout = {LONG_MAX, 0};
 	USBStatus uStatus = queueTake(&dev->queue, (Item*)&wrapper);
 	CHECK_STATUS(uStatus, uStatus, exit, "usbBulkAwaitCompletion(): Work queue fetch error");
 	transfer = wrapper->transfer;
