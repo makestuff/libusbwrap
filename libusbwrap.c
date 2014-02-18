@@ -150,7 +150,11 @@ DLLEXPORT(USBStatus) usbIsDeviceAvailable(const char *vp, bool *isAvailable, con
 	struct libusb_device *thisDev;
 	struct libusb_device_descriptor desc;
 	uint16 vid, pid, did;
-	int status, count = (int)libusb_get_device_list(m_ctx, &devList);
+	int status, count;
+	CHECK_STATUS(
+		!m_ctx, USB_INIT, cleanup,
+		"usbIsDeviceAvailable(): you forgot to call usbInitialise()!");
+	count = (int)libusb_get_device_list(m_ctx, &devList);
 	CHECK_STATUS(
 		count < 0, USB_CANNOT_OPEN_DEVICE, cleanup,
 		"usbIsDeviceAvailable(): %s", libusb_error_name(count));
@@ -218,6 +222,9 @@ DLLEXPORT(USBStatus) usbOpenDevice(
 	int status;
 	struct USBDevice *newWrapper;
 	struct libusb_device_handle *newHandle;
+	CHECK_STATUS(
+		!m_ctx, USB_INIT, exit,
+		"usbOpenDevice(): you forgot to call usbInitialise()!");
 	CHECK_STATUS(
 		!usbValidateVidPid(vp), USB_INVALID_VIDPID, exit,
 		"usbOpenDevice(): "FORMAT_ERR, vp);
