@@ -20,11 +20,7 @@
 
 #include "libusbwrap.h"
 #include "unbounded_queue.h"
-#ifdef WIN32
-	#include <libusbx-1.0/libusb.h>
-#else
-	#include <libusb-1.0/libusb.h>
-#endif
+#include <libusb-1.0/libusb.h>
 
 #ifdef __cplusplus
 extern "C" {
