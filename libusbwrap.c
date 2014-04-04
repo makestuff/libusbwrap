@@ -389,7 +389,7 @@ cleanup:
 	return retVal;
 }
 
-static void WINAPI bulk_transfer_cb(struct libusb_transfer *transfer) {
+static void LIBUSB_CALL bulk_transfer_cb(struct libusb_transfer *transfer) {
 	int *completed = transfer->user_data;
 	*completed = 1;
 }
