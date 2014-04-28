@@ -38,6 +38,7 @@ static libusb_device_handle *libusbOpenWithVidPid(
 	struct libusb_device **devs;
 	struct libusb_device *found = NULL;
 	struct libusb_device *dev;
+	struct libusb_config_descriptor* desc = NULL;
 	size_t i = 0;
 	int status = (int)libusb_get_device_list(ctx, &devs);
 	CHECK_STATUS(status < 0, NULL, cleanup, libusb_error_name(status));
@@ -60,11 +61,27 @@ static libusb_device_handle *libusbOpenWithVidPid(
 	if ( found ) {
 		status = libusb_open(found, &retVal);
 		CHECK_STATUS(status < 0, NULL, cleanup, libusb_error_name(status));
+
+		if (libusb_has_capability(LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER)) {
+			// Detact the kernel drivers from this device so we can control it.
+			status = libusb_get_active_config_descriptor(found, &desc);
+			CHECK_STATUS(status < 0, NULL, cleanup, libusb_error_name(status));
+
+			for (int i = 0; i < desc->bNumInterfaces; i++) {
+				if (libusb_kernel_driver_active(retVal, i)) {
+					status = libusb_detach_kernel_driver(retVal, i);
+					CHECK_STATUS(status < 0, NULL, cleanup, libusb_error_name(status));
+				}
+			}
+		}
 	} else {
 		errRender(error, "device not found");
 	}
 
 cleanup:
+	if (desc != NULL) {
+		libusb_free_config_descriptor(desc);
+	}
 	libusb_free_device_list(devs, 1);
 	return retVal;
 }
