@@ -20,7 +20,7 @@
 
 // Print out the configuration tree
 //
-DLLEXPORT(USBStatus) usbPrintConfiguration(struct USBDevice *deviceHandle, FILE *stream, const char **error) {
+DLLEXPORT(USBStatus) usbPrintConfiguration(struct USBDevice *dev, FILE *stream, const char **error) {
 	USBStatus retVal = USB_SUCCESS;
 	uint8 descriptorBuffer[1024];
 	uint8 *ptr = descriptorBuffer;
@@ -29,7 +29,7 @@ DLLEXPORT(USBStatus) usbPrintConfiguration(struct USBDevice *deviceHandle, FILE 
 	struct libusb_interface_descriptor *interfaceDesc;
 	struct libusb_endpoint_descriptor *endpointDesc;
 	int status = libusb_control_transfer(
-		unwrap(deviceHandle),
+		dev->handle,
 		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_STANDARD | LIBUSB_RECIPIENT_DEVICE,
 		LIBUSB_REQUEST_GET_DESCRIPTOR,  // bRequest
 		0x0200,                         // wValue
