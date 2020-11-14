@@ -15,16 +15,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #ifdef WIN32
-#include <Windows.h>
+  #include <Windows.h>
 #else
-#define _BSD_SOURCE
-#include <unistd.h>
+  #define _DEFAULT_SOURCE
+  #include <unistd.h>
 #endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <makestuff.h>
-#include <liberror.h>
+#include <makestuff/common.h>
+#include <makestuff/liberror.h>
 #include "private.h"
 
 static struct libusb_context *m_ctx = NULL;
@@ -133,9 +133,21 @@ DLLEXPORT(USBStatus) usbInitialise(int debugLevel, const char **error) {
 	USBStatus retVal = USB_SUCCESS;
 	int status = libusb_init(&m_ctx);
 	CHECK_STATUS(status, USB_INIT, cleanup, "usbInitialise(): %s", libusb_error_name(status));
-	libusb_set_debug(m_ctx, debugLevel);
+	#if LIBUSB_API_VERSION >= 0x01000106
+		libusb_set_option(m_ctx, LIBUSB_OPTION_LOG_LEVEL, debugLevel);
+	#else
+		libusb_set_debug(m_ctx, debugLevel);
+	#endif
 cleanup:
 	return retVal;
+}
+
+// Shutdown LibUSB.
+//
+DLLEXPORT(void) usbShutdown() {
+	if (m_ctx) {
+		libusb_exit(m_ctx);
+	}
 }
 
 #define isMatching (thisDevice->descriptor.idVendor == vid && thisDevice->descriptor.idProduct == pid)
@@ -535,8 +547,8 @@ DLLEXPORT(USBStatus) usbBulkAwaitCompletion(
 					}
 				}
 			}
-			CHECK_STATUS(
-				true, USB_ASYNC_EVENT, commit,
+			FAIL_RET(
+				USB_ASYNC_EVENT, commit,
 				"usbBulkAwaitCompletion(): Event error: %s", libusb_error_name(iStatus));
 		}
 	}

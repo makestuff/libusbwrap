@@ -1,8 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
+#include <makestuff/common.h>
+#include <makestuff/libusbwrap.h>
 #include "unbounded_queue.h"
-#include <makestuff.h>
-#include "libusbwrap.h"
 
 USBStatus queueInit(
 	struct UnboundedQueue *self, size_t capacity, CreateFunc createFunc, DestroyFunc destroyFunc)
@@ -48,14 +48,14 @@ void queueDestroy(struct UnboundedQueue *self) {
 //
 USBStatus queuePut(struct UnboundedQueue *self, Item *item) {
 	USBStatus retVal = USB_SUCCESS;
+	Item *newArray = NULL;
+	size_t index = 0;
 	if ( self->numItems == self->capacity ) {
-		size_t i;
-		Item *newArray;
 		Item *const ptr = self->itemArray + self->takeIndex;
 		const size_t firstHalfLength = self->capacity - self->takeIndex;
 		const size_t secondHalfLength = self->takeIndex;
 		const size_t newCapacity = 2 * self->capacity;
-		Item item;
+		Item newItem;
 		newArray = (Item *)calloc(newCapacity, sizeof(Item));
 		CHECK_STATUS(newArray == NULL, USB_ALLOC_ERR, cleanup);
 		memcpy((void*)newArray, ptr, firstHalfLength * sizeof(Item));
@@ -66,18 +66,26 @@ USBStatus queuePut(struct UnboundedQueue *self, Item *item) {
 				secondHalfLength * sizeof(Item)
 			);
 		}
-		for ( i = self->capacity; i < newCapacity; i++ ) {
-			item = (*self->createFunc)();
-			CHECK_STATUS(item == NULL, USB_ALLOC_ERR, cleanup);
-			newArray[i] = item;
+		for ( index = self->capacity; index < newCapacity; index++ ) {
+			newItem = (*self->createFunc)();
+			CHECK_STATUS(newItem == NULL, USB_ALLOC_ERR, cleanup);
+			newArray[index] = newItem;
 		}
+		free((void*)self->itemArray);
 		self->itemArray = newArray;
 		self->takeIndex = 0;
 		self->putIndex = self->capacity;
 		self->capacity = newCapacity;
 	}
 	*item = self->itemArray[self->putIndex];
+	return USB_SUCCESS;
 cleanup:
+	if (newArray) {
+		for ( size_t i = self->capacity; i < index; i++ ) {
+			(*self->destroyFunc)(newArray[i]);
+		}
+		free((void*)newArray);
+	}
 	return retVal;
 }
 

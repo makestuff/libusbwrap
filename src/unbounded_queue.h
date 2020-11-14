@@ -1,7 +1,7 @@
 #ifndef UNBOUNDED_QUEUE_H
 #define UNBOUNDED_QUEUE_H
 
-#include "libusbwrap.h"
+#include <makestuff/libusbwrap.h>
 
 #ifdef __cplusplus
 extern "C" {

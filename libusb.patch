@@ -1,0 +1,52 @@
+diff -r -U1 -N old/CMakeLists.txt new/CMakeLists.txt
+--- old/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ new/CMakeLists.txt	2020-11-09 21:29:32.655791922 +0000
+@@ -0,0 +1,20 @@
++project(usb-1.0)
++
++add_library(${PROJECT_NAME} STATIC
++  libusb/core.c
++  libusb/descriptor.c
++  libusb/hotplug.c
++  libusb/io.c
++  libusb/os/poll_windows.c
++  libusb/strerror.c
++  libusb/sync.c
++  libusb/os/threads_windows.c
++  libusb/os/windows_nt_common.c
++  libusb/os/windows_usbdk.c
++  libusb/os/windows_winusb.c
++)
++
++target_include_directories(${PROJECT_NAME}
++  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
++  PRIVATE libusb msvc
++)
+diff -U1 -r old/libusb/io.c new/libusb/io.c
+--- old/libusb/io.c	2020-11-10 10:00:03.634154870 +0000
++++ new/libusb/io.c	2020-11-10 10:10:26.220831003 +0000
+@@ -2102,3 +2102,3 @@
+ 	struct pollfd *fds = NULL;
+-	int i = -1;
++	unsigned int i = 0;
+ 	int timeout_ms;
+@@ -2156,5 +2156,5 @@
+ 			struct libusb_pollfd *pollfd = &ipollfd->pollfd;
+-			i++;
+ 			ctx->pollfds[i].fd = pollfd->fd;
+ 			ctx->pollfds[i].events = pollfd->events;
++			i++;
+ 		}
+diff -U1 -r old/libusb/os/poll_windows.c new/libusb/os/poll_windows.c
+--- old/libusb/os/poll_windows.c	2020-11-10 09:55:29.981467999 +0000
++++ new/libusb/os/poll_windows.c	2020-11-10 10:02:11.076339151 +0000
+@@ -153,3 +153,3 @@
+ {
+-	int n;
++	unsigned int n;
+ 	usbi_mutex_static_lock(&fd_table_lock);
+@@ -163,3 +163,3 @@
+ {
+-	int n;
++	unsigned int n;
+ 	struct file_descriptor *fd;

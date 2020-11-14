@@ -24,7 +24,7 @@
 #ifndef LIBUSBWRAP_H
 #define LIBUSBWRAP_H
 
-#include <makestuff.h>
+#include <makestuff/common.h>
 #include <stdio.h>
 
 #ifdef __cplusplus
@@ -103,6 +103,13 @@ extern "C" {
 	DLLEXPORT(USBStatus) usbInitialise(
 		int debugLevel, const char **error
 	) WARN_UNUSED_RESULT;
+
+	/**
+	 * @brief Shutdown LibUSB.
+	 *
+	 * This frees up any resources used by LibUSB.
+	 */
+	DLLEXPORT(void) usbShutdown();
 
 	/**
 	 * @brief Determine whether or not the specified device is attached.

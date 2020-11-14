@@ -14,8 +14,32 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <liberror.h>
 
-DLLEXPORT(void) usbFreeError(const char *err) {
-	errFree(err);
+#ifndef PRIVATE_H
+#define PRIVATE_H
+
+#ifdef WIN32
+  #pragma warning(push)
+  #pragma warning(disable: 4200)
+  #include <libusb/libusb.h>
+  #pragma warning(pop)
+#else
+  #include <libusb-1.0/libusb.h>
+#endif
+#include <makestuff/libusbwrap.h>
+#include "unbounded_queue.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+	struct USBDevice {
+		struct libusb_device_handle *handle;
+		struct UnboundedQueue queue;
+	};
+
+#ifdef __cplusplus
 }
+#endif
+
+#endif
