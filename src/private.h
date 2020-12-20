@@ -18,7 +18,7 @@
 #ifndef PRIVATE_H
 #define PRIVATE_H
 
-#ifdef WIN32
+#ifdef _MSC_VER
   #pragma warning(push)
   #pragma warning(disable: 4200)
   #include <libusb/libusb.h>
