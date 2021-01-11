@@ -1,5 +1,11 @@
 project(usbwrap)
 
+if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  set(LIBUSBWRAP_LIB_DIR "bin")
+else()
+  set(LIBUSBWRAP_LIB_DIR "lib")
+endif()
+
 # Create a shared library
 file(GLOB SOURCES src/*.cpp src/*.c)
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
@@ -14,8 +20,8 @@ target_link_libraries(${PROJECT_NAME} PUBLIC ${LIB_DEPENDS})
 # What to install
 install(TARGETS ${PROJECT_NAME}
   RUNTIME DESTINATION bin
-  LIBRARY DESTINATION bin
-  ARCHIVE DESTINATION bin
+  LIBRARY DESTINATION ${LIBUSBWRAP_LIB_DIR}
+  ARCHIVE DESTINATION ${LIBUSBWRAP_LIB_DIR}
 )
 install(
   DIRECTORY include/makestuff DESTINATION include
