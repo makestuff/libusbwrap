@@ -33,10 +33,10 @@
 extern "C" {
 #endif
 
-	struct USBDevice {
-		struct libusb_device_handle *handle;
-		struct UnboundedQueue queue;
-	};
+  struct USBDevice {
+    struct libusb_device_handle *handle;
+    struct UnboundedQueue queue;
+  };
 
 #ifdef __cplusplus
 }
