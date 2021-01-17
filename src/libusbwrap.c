@@ -115,12 +115,12 @@ DLLEXPORT(bool) usbValidateVidPid(const char *vp) {
     for (i = 10; i < 14; i++) {
       ch = vp[i];
       if (
-	ch < '0' ||
-	(ch > '9' && ch < 'A') ||
-	(ch > 'F' && ch < 'a') ||
-	ch > 'f')
+        ch < '0' ||
+        (ch > '9' && ch < 'A') ||
+        (ch > 'F' && ch < 'a') ||
+        ch > 'f')
       {
-	return false;
+        return false;
       }
     }
   }
@@ -538,18 +538,18 @@ DLLEXPORT(USBStatus) usbBulkAwaitCompletion(
     iStatus = libusb_handle_events_timeout_completed(m_ctx, &timeout, completed);
     if (iStatus < 0) {
       if (iStatus == LIBUSB_ERROR_INTERRUPTED) {
-	continue;
+        continue;
       }
       if (libusb_cancel_transfer(transfer) == LIBUSB_SUCCESS) {
-	while (*completed == 0) {
-	  if (libusb_handle_events_timeout_completed(m_ctx, &timeout, completed) < 0) {
-	    break;
-	  }
-	}
+        while (*completed == 0) {
+          if (libusb_handle_events_timeout_completed(m_ctx, &timeout, completed) < 0) {
+            break;
+          }
+        }
       }
       FAIL_RET(
-	USB_ASYNC_EVENT, commit,
-	"usbBulkAwaitCompletion(): Event error: %s", libusb_error_name(iStatus));
+        USB_ASYNC_EVENT, commit,
+        "usbBulkAwaitCompletion(): Event error: %s", libusb_error_name(iStatus));
     }
   }
 

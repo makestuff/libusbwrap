@@ -76,16 +76,16 @@ DLLEXPORT(USBStatus) usbPrintConfiguration(struct USBDevice *dev, FILE *stream, 
     while (endpointNum--) {
       endpointDesc = (struct libusb_endpoint_descriptor *)ptr;
       fprintf(
-	stream,
-	"        endpointDescriptor {\n            bLength = 0x%02X\n            bDescriptorType = 0x%02X\n            bEndpointAddress = 0x%02X\n            bmAttributes = 0x%02X\n            wMaxPacketSize = 0x%02X\n            bInterval = 0x%02X\n            bRefresh = 0x%02X\n            bSynchAddress = 0x%02X\n        }\n",
-	endpointDesc->bLength,
-	endpointDesc->bDescriptorType,
-	endpointDesc->bEndpointAddress,
-	endpointDesc->bmAttributes,
-	littleEndian16(endpointDesc->wMaxPacketSize),
-	endpointDesc->bInterval,
-	endpointDesc->bRefresh,
-	endpointDesc->bSynchAddress
+        stream,
+        "        endpointDescriptor {\n            bLength = 0x%02X\n            bDescriptorType = 0x%02X\n            bEndpointAddress = 0x%02X\n            bmAttributes = 0x%02X\n            wMaxPacketSize = 0x%02X\n            bInterval = 0x%02X\n            bRefresh = 0x%02X\n            bSynchAddress = 0x%02X\n        }\n",
+        endpointDesc->bLength,
+        endpointDesc->bDescriptorType,
+        endpointDesc->bEndpointAddress,
+        endpointDesc->bmAttributes,
+        littleEndian16(endpointDesc->wMaxPacketSize),
+        endpointDesc->bInterval,
+        endpointDesc->bRefresh,
+        endpointDesc->bSynchAddress
       );
       ptr += endpointDesc->bLength;
     }

@@ -43,12 +43,12 @@
     if (len > 8) {
       len = 8;
       while (len--) {
-	printf(" %02X", *ptr++);
+        printf(" %02X", *ptr++);
       }
       printf("...\n");
     } else {
       while (len--) {
-	printf(" %02X", *ptr++);
+        printf(" %02X", *ptr++);
       }
       printf("\n");
     }

@@ -61,9 +61,9 @@ USBStatus queuePut(struct UnboundedQueue *self, Item *item) {
     memcpy((void*)newArray, ptr, firstHalfLength * sizeof(Item));
     if (secondHalfLength) {
       memcpy(
-	(void*)(newArray + firstHalfLength),
-	self->itemArray,
-	secondHalfLength * sizeof(Item)
+        (void*)(newArray + firstHalfLength),
+        self->itemArray,
+        secondHalfLength * sizeof(Item)
       );
     }
     for (index = self->capacity; index < newCapacity; index++) {
