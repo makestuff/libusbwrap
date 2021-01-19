@@ -1,0 +1,12 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/include
+
+Name: libusbwrap
+Description: A thin wrapper around LibUSB (http://libusb.org).
+Requires: common liberror libusb-1.0
+Version: 20170708
+Libs: -L${libdir} -lerror
+Cflags: -I${includedir}
+
